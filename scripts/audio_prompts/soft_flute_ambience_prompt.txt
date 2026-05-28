@@ -1,0 +1,14 @@
+Soft peaceful Indian bansuri flute meditation music.
+Spiritual sunrise atmosphere.
+Gentle flowing melody with calming ambience.
+Slow devotional mood.
+Minimal percussion.
+Premium meditation app background music.
+
+Target output:
+assets/audio/flute_intro.mp3
+
+Usage:
+Generate a seamless, quiet 15-30 second background ambience track from this
+prompt, then save it as assets/audio/flute_intro.mp3. The English verse audio
+generator will mix it quietly under narration by default when the file exists.

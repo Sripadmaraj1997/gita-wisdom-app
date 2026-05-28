@@ -1,0 +1,6 @@
+package com.mycompany.gitawisdom
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity: FlutterActivity() {
+}

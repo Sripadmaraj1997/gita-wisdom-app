@@ -1,0 +1,78 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email == 'pamidip@hotmail.com';
+    }
+
+    function ownsExistingUserId() {
+      return signedIn()
+        && resource.data.userId is string
+        && resource.data.userId == request.auth.uid;
+    }
+
+    function ownsRequestedUserId() {
+      return signedIn()
+        && request.resource.data.userId is string
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow create, read, update: if signedIn() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    match /gita_chapters/{chapterId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    match /gita_verses/{verseId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    match /owner_interpretations/{interpretationId} {
+      allow read: if signedIn();
+      allow create: if isOwner()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.ownerEmail == 'pamidip@hotmail.com'
+        && request.resource.data.isOwnerWisdom == true;
+      allow update: if isOwner()
+        && request.resource.data.userId == request.auth.uid
+        && resource.data.ownerEmail == 'pamidip@hotmail.com'
+        && request.resource.data.ownerEmail == 'pamidip@hotmail.com'
+        && request.resource.data.isOwnerWisdom == true;
+      allow delete: if isOwner()
+        && resource.data.ownerEmail == 'pamidip@hotmail.com';
+    }
+
+    match /journals/{journalId} {
+      allow create: if ownsRequestedUserId();
+      allow read, delete: if ownsExistingUserId();
+      allow update: if ownsExistingUserId() && ownsRequestedUserId();
+    }
+
+    match /saved_verses/{savedVerseId} {
+      allow create: if ownsRequestedUserId();
+      allow read, delete: if ownsExistingUserId();
+      allow update: if ownsExistingUserId() && ownsRequestedUserId();
+    }
+
+    match /rag_embeddings/{embeddingId} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
