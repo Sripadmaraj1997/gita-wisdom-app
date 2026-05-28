@@ -21,16 +21,6 @@ class DailyGuidance {
   final String practiceToday;
   final String journalPrompt;
   final String topic;
-
-  String get shareText => [
-        reference,
-        reflection,
-        '',
-        'Practice Today:',
-        practiceToday,
-        '',
-        '-- Gita Wisdom',
-      ].join('\n');
 }
 
 class DailyCompanionService {
@@ -41,7 +31,8 @@ class DailyCompanionService {
       verseId: '2.47',
       chapterNumber: 2,
       reference: 'Bhagavad Gita 2.47',
-      reflection: 'Focus on sincere effort, not anxiety over results.',
+      reflection:
+          'Peace grows when you give sincere effort without trying to control every result.',
       practiceToday:
           'Take one meaningful action today without checking for outcome.',
       journalPrompt: 'What outcome are you attached to today?',
@@ -51,7 +42,8 @@ class DailyCompanionService {
       verseId: '2.14',
       chapterNumber: 2,
       reference: 'Bhagavad Gita 2.14',
-      reflection: 'Difficult feelings rise and pass. Your steadiness can grow.',
+      reflection:
+          'Difficult feelings rise and pass. You do not have to become every feeling that visits you.',
       practiceToday: 'Pause before reacting and let one feeling move through.',
       journalPrompt: 'What feeling can you allow without becoming it?',
       topic: 'peace',
@@ -60,7 +52,8 @@ class DailyCompanionService {
       verseId: '3.8',
       chapterNumber: 3,
       reference: 'Bhagavad Gita 3.8',
-      reflection: 'A clear duty done with care becomes a path to peace.',
+      reflection:
+          'A simple duty done with care can become a quiet path back to peace.',
       practiceToday: 'Give one responsibility fifteen minutes of full effort.',
       journalPrompt: 'What duty can you do with love today?',
       topic: 'discipline',
@@ -69,7 +62,8 @@ class DailyCompanionService {
       verseId: '6.5',
       chapterNumber: 6,
       reference: 'Bhagavad Gita 6.5',
-      reflection: 'Your own mind can become your helper through gentle effort.',
+      reflection:
+          'Your mind can become a friend when you guide it with patience instead of force.',
       practiceToday: 'Speak to yourself once today with patience and courage.',
       journalPrompt: 'Where can you become your own ally today?',
       topic: 'clarity',
@@ -78,7 +72,8 @@ class DailyCompanionService {
       verseId: '12.13',
       chapterNumber: 12,
       reference: 'Bhagavad Gita 12.13',
-      reflection: 'Devotion is expressed through kindness, patience, and care.',
+      reflection:
+          'Devotion becomes real in small moments of kindness, patience, and care.',
       practiceToday: 'Offer one quiet act of kindness without needing credit.',
       journalPrompt: 'How can devotion become visible in your actions?',
       topic: 'devotion',

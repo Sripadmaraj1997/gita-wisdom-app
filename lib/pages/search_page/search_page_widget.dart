@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/gita_data.dart';
+import '../../services/local_storage_service.dart';
 import '../gita_common/gita_common.dart';
 
 class SearchPageWidget extends StatefulWidget {
@@ -172,6 +173,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                   onSelected: (topic) {
                     _debounce?.cancel();
                     _controller.text = topic;
+                    unawaited(LocalStorageService.recordReflectedTopic(topic));
                     setState(() {
                       _query = topic;
                       _searchFuture = GitaRepository.search(topic, limit: 40);

@@ -1,11 +1,10 @@
 // Home screen for the daily spiritual companion experience.
 //
 // This page intentionally prioritizes a calm daily flow over dashboard density:
-// Continue Reading, Read/Ask actions, Today's Guidance, Daily Verse, One Minute
-// Wisdom, emotional search topics, and secondary tools. All state is local.
+// Continue Reading, Read/Ask actions, Today's Guidance, Daily Verse, recent
+// reflections, and secondary tools. All state is local.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../data/gita_data.dart';
 import '../../services/daily_companion_service.dart';
 import '../../services/local_storage_service.dart';
@@ -134,27 +133,6 @@ class HomePageWidget extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 28),
-                AnimatedEntrance(
-                  delay: const Duration(milliseconds: 110),
-                  child: _OneMinuteWisdomCard(
-                    onTap: () => context.push('/oneMinuteWisdomPage'),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                AnimatedEntrance(
-                  delay: const Duration(milliseconds: 130),
-                  child: _SeekingTodaySection(
-                    onSelected: (topic) {
-                      LocalStorageService.recordReflectedTopic(topic);
-                      context.go(Uri(
-                        path: '/searchPage',
-                        queryParameters: {'q': topic.toLowerCase()},
-                      ).toString());
-                    },
-                  ),
-                ),
-                const SizedBox(height: 28),
                 _RecentlyReflectedSection(
                   onOpenVerse: (verseId) => context.push(Uri(
                     path: '/verseReaderPage',
@@ -174,8 +152,6 @@ class HomePageWidget extends StatelessWidget {
                     onSaved: () => context.push('/savedVersesPage'),
                   ),
                 ),
-                const SizedBox(height: 18),
-                const _FirstTimeTipsCard(),
               ],
             ),
           ),
@@ -191,8 +167,8 @@ class _KrishnaHeroSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 320),
-      padding: const EdgeInsets.all(26),
+      constraints: const BoxConstraints(minHeight: 248),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -223,7 +199,7 @@ class _KrishnaHeroSection extends StatelessWidget {
       child: Stack(
         children: [
           const Positioned(
-            top: 18,
+            top: 10,
             right: 4,
             child: _KrishnaInspiredImageArea(),
           ),
@@ -257,7 +233,7 @@ class _KrishnaHeroSection extends StatelessWidget {
                   border: Border.all(color: kGold.withValues(alpha: 0.22)),
                 ),
                 child: Text(
-                  'Temple at dawn',
+                  'Gita Wisdom',
                   style: gitaBody(
                     color: kAntiqueGold,
                     size: 12,
@@ -268,7 +244,7 @@ class _KrishnaHeroSection extends StatelessWidget {
               const SizedBox(height: 18),
               Text(
                 'Welcome back.',
-                style: gitaTitle(38).copyWith(
+                style: gitaTitle(33).copyWith(
                   color: kAntiqueGold,
                   height: 1.05,
                   shadows: [
@@ -286,17 +262,6 @@ class _KrishnaHeroSection extends StatelessWidget {
                   color: kText,
                   size: 17,
                   weight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: 250,
-                child: Text(
-                  'Let the Gita guide one calm step, one clear thought, and one sincere action.',
-                  style: gitaBody(
-                    color: kText.withValues(alpha: 0.84),
-                    size: 14,
-                  ),
                 ),
               ),
             ],
@@ -417,86 +382,6 @@ class _KrishnaInspiredImageArea extends StatelessWidget {
   }
 }
 
-class _FirstTimeTipsCard extends StatefulWidget {
-  const _FirstTimeTipsCard();
-
-  @override
-  State<_FirstTimeTipsCard> createState() => _FirstTimeTipsCardState();
-}
-
-class _FirstTimeTipsCardState extends State<_FirstTimeTipsCard> {
-  bool _loaded = false;
-  bool _dismissed = true;
-
-  static const _tips = [
-    'Tap Play to hear verse audio.',
-    'Save verses that speak to your heart.',
-    'Use Ask Gita for peaceful guidance.',
-    'Journal reflections that bring clarity.',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    // Tips are shown once per install and can be dismissed. They live below the
-    // primary Home flow so first-time education does not interrupt daily use.
-    final dismissed = await LocalStorageService.firstTimeTipsDismissed();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _dismissed = dismissed;
-      _loaded = true;
-    });
-  }
-
-  Future<void> _dismiss() async {
-    await LocalStorageService.setFirstTimeTipsDismissed(true);
-    if (mounted) {
-      setState(() => _dismissed = true);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_loaded || _dismissed) {
-      return const SizedBox.shrink();
-    }
-    return AnimatedEntrance(
-      child: PremiumCard(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const IconMedallion(icon: Icons.tips_and_updates_rounded, size: 42),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final tip in _tips) AccentPill(tip),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            AnimatedGoldIconButton(
-              icon: Icons.close_rounded,
-              tooltip: 'Dismiss tips',
-              backgroundColor: kCard2,
-              onTap: _dismiss,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 Future<void> _recordReflectedVerse(String verseId) async {
   try {
     final verse = await GitaRepository.verseById(verseId);
@@ -580,42 +465,6 @@ class _TodaysGuidanceCardState extends State<_TodaysGuidanceCard> {
     // per day.
     await LocalStorageService.recordDailyGuidanceOpened();
     return LocalStorageService.reflectionStreak();
-  }
-
-  Future<void> _completePractice() async {
-    await LocalStorageService.recordPracticeCompleted();
-    await _recordReflectedVerse(widget.guidance.verseId);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _streakFuture = LocalStorageService.reflectionStreak();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Practice saved for today')),
-    );
-  }
-
-  Future<void> _shareWisdom() async {
-    try {
-      // MVP sharing is plain text only. Image-card generation can be added
-      // later without changing the guidance data model.
-      await SharePlus.instance.share(
-        ShareParams(
-          text: widget.guidance.shareText,
-          subject: widget.guidance.reference,
-        ),
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Share today guidance failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not prepare sharing.')),
-      );
-    }
   }
 
   @override
@@ -727,19 +576,9 @@ class _TodaysGuidanceCardState extends State<_TodaysGuidanceCard> {
                   onTap: () => widget.onReadVerse(guidance),
                 ),
                 _ReflectionAction(
-                  icon: Icons.check_rounded,
-                  label: 'Practice Done',
-                  onTap: _completePractice,
-                ),
-                _ReflectionAction(
                   icon: Icons.edit_note_rounded,
                   label: 'Journal Prompt',
                   onTap: () => widget.onJournal(guidance),
-                ),
-                _ReflectionAction(
-                  icon: Icons.ios_share_rounded,
-                  label: 'Share Wisdom',
-                  onTap: _shareWisdom,
                 ),
               ],
             ),
@@ -795,46 +634,6 @@ class _PracticeTodayBox extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OneMinuteWisdomCard extends StatelessWidget {
-  const _OneMinuteWisdomCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PremiumCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          const IconMedallion(
-            icon: Icons.hourglass_bottom_rounded,
-            size: 52,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'One Minute Wisdom',
-                  style: gitaTitle(22).copyWith(color: kAntiqueGold),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Breathe, read, reflect, and carry one insight into your day.',
-                  style: gitaBody(color: kMuted, size: 13),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: kGold),
         ],
       ),
     );
@@ -1169,45 +968,39 @@ class _RecentlyReflectedSection extends StatelessWidget {
       future: LocalStorageService.recentReflections(),
       builder: (context, snapshot) {
         final items = snapshot.data ?? const [];
+        if (snapshot.connectionState != ConnectionState.done || items.isEmpty) {
+          return const SizedBox.shrink();
+        }
         return AnimatedEntrance(
           delay: const Duration(milliseconds: 92),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 28),
               const _SectionHeader(title: 'Recently Reflected On'),
               const SizedBox(height: 14),
-              if (snapshot.connectionState != ConnectionState.done)
-                const LoadingStateCard(message: 'Loading reflections...')
-              else if (items.isEmpty)
-                const EmptyStateCard(
-                  icon: Icons.spa_rounded,
-                  title: 'Your reflections will gather here.',
-                  body:
-                      'Open a verse, complete a practice, or choose a topic to return to it later.',
-                )
-              else
-                PremiumCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (final item in items)
-                        _ReflectedChip(
-                          item: item,
-                          onTap: () {
-                            if (item.isVerse) {
-                              onOpenVerse(item.verseId!);
-                              return;
-                            }
-                            if (item.isTopic) {
-                              onOpenTopic(item.topic!);
-                            }
-                          },
-                        ),
-                    ],
-                  ),
+              PremiumCard(
+                padding: const EdgeInsets.all(16),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final item in items)
+                      _ReflectedChip(
+                        item: item,
+                        onTap: () {
+                          if (item.isVerse) {
+                            onOpenVerse(item.verseId!);
+                            return;
+                          }
+                          if (item.isTopic) {
+                            onOpenTopic(item.topic!);
+                          }
+                        },
+                      ),
+                  ],
                 ),
+              ),
             ],
           ),
         );
@@ -1306,8 +1099,8 @@ class _SecondaryActionCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      ('Search', Icons.travel_explore_rounded, onSearch),
       ('Journal', Icons.edit_note_rounded, onJournal),
+      ('Search', Icons.travel_explore_rounded, onSearch),
       ('Saved Verses', Icons.bookmark_rounded, onSaved),
     ];
     return Column(
@@ -1320,100 +1113,6 @@ class _SecondaryActionCards extends StatelessWidget {
           highlightedIndexes: const {},
         ),
       ],
-    );
-  }
-}
-
-class _SeekingTodaySection extends StatelessWidget {
-  const _SeekingTodaySection({required this.onSelected});
-
-  final ValueChanged<String> onSelected;
-
-  static const _topics = [
-    ('Peace', Icons.self_improvement_rounded),
-    ('Fear', Icons.shield_rounded),
-    ('Anger', Icons.local_fire_department_rounded),
-    ('Purpose', Icons.explore_rounded),
-    ('Discipline', Icons.fitness_center_rounded),
-    ('Attachment', Icons.link_off_rounded),
-    ('Devotion', Icons.favorite_rounded),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return PremiumCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'What are you seeking today?',
-            style: gitaBody(color: kText, size: 18, weight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Choose a theme and continue with verses for that feeling.',
-            style: gitaBody(color: kMuted, size: 13),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final topic in _topics)
-                _SeekingChip(
-                  label: topic.$1,
-                  icon: topic.$2,
-                  onTap: () => onSelected(topic.$1),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SeekingChip extends StatelessWidget {
-  const _SeekingChip({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(100),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 42),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-        decoration: BoxDecoration(
-          color: kCard2.withValues(alpha: 0.76),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: kGold.withValues(alpha: 0.22)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: kGold, size: 16),
-            const SizedBox(width: 7),
-            Text(
-              label,
-              style: gitaBody(
-                color: kText,
-                size: 12,
-                weight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

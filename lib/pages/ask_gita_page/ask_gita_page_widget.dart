@@ -973,10 +973,10 @@ String _plainMeaningFor(String? sourceText) {
     return 'This guidance is pointing you toward calm action, self-awareness, and trust. Instead of reacting from fear or pressure, return to what can be done with clarity now.';
   }
   final compact = source.replaceAll(RegExp(r'\s+'), ' ');
-  if (compact.length <= 360) {
+  if (compact.length <= 260) {
     return compact;
   }
-  return '${compact.substring(0, 357).trimRight()}...';
+  return '${compact.substring(0, 257).trimRight()}...';
 }
 
 String _practiceFor(String question) {

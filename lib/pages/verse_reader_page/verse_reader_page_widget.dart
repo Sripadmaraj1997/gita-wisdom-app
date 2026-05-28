@@ -229,8 +229,6 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                                 },
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            const _SwipeHint(),
                           ],
                         ),
                       );
@@ -881,27 +879,6 @@ class _VerseContentCard extends StatelessWidget {
               onSanskritChanged: onSanskritChanged,
               onTransliterationChanged: onTransliterationChanged,
             ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                AccentPill('Verse ${currentIndex + 1} of $totalVerses'),
-                AccentPill('Gita ${verse.chapterNumber}.${verse.verseNumber}'),
-                if (chapter != null) AccentPill(chapter!.title),
-              ],
-            ),
-            if (verse.allTags.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final tag in verse.allTags) AccentPill('#$tag'),
-                ],
-              ),
-            ],
           ],
         ),
       ),
@@ -1057,36 +1034,6 @@ class _VerseSection extends StatelessWidget {
         const SizedBox(height: 11),
         child,
       ],
-    );
-  }
-}
-
-class _SwipeHint extends StatelessWidget {
-  const _SwipeHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        decoration: BoxDecoration(
-          color: kCard.withValues(alpha: 0.62),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: kGold.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.swipe_rounded,
-                color: kGold.withValues(alpha: 0.8), size: 16),
-            const SizedBox(width: 7),
-            Text(
-              'Swipe for previous or next verse',
-              style: gitaBody(color: kMuted, size: 12),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
