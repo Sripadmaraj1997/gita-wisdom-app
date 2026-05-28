@@ -4,6 +4,10 @@
 // journal entries, Ask Gita Lite history, reading preferences, daily reflection
 // streaks, and recent items. Keeping this service isolated makes future cloud
 // sync possible without touching the UI screens.
+//
+// TODO(cloud-sync): If accounts are introduced, keep these keys as the local
+// cache contract and sync them through a repository layer instead of reading
+// SharedPreferences directly from UI widgets.
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -405,7 +409,6 @@ class LocalStorageService {
   static const readerShowSanskritKey = 'gita_reader_show_sanskrit';
   static const readerShowTransliterationKey =
       'gita_reader_show_transliteration';
-  static const firstTimeTipsDismissedKey = 'gita_first_time_tips_dismissed';
   static const completedPracticeDatesKey = 'gita_completed_practice_dates';
   static const recentReflectionsKey = 'gita_recent_reflections';
   static const themeModeKey = 'gita_theme_mode';
@@ -797,7 +800,6 @@ class LocalStorageService {
     await prefs.remove(readerFontScaleKey);
     await prefs.remove(readerShowSanskritKey);
     await prefs.remove(readerShowTransliterationKey);
-    await prefs.remove(firstTimeTipsDismissedKey);
     await prefs.remove(completedPracticeDatesKey);
     await prefs.remove(recentReflectionsKey);
     await prefs.remove(themeModeKey);
@@ -863,27 +865,6 @@ class LocalStorageService {
       await prefs.setBool(readerShowTransliterationKey, value);
     } catch (error, stackTrace) {
       debugPrint('Reader transliteration visibility save failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-  }
-
-  static Future<bool> firstTimeTipsDismissed() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getBool(firstTimeTipsDismissedKey) ?? false;
-    } catch (error, stackTrace) {
-      debugPrint('First-time tips state load failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      return false;
-    }
-  }
-
-  static Future<void> setFirstTimeTipsDismissed(bool value) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(firstTimeTipsDismissedKey, value);
-    } catch (error, stackTrace) {
-      debugPrint('First-time tips state save failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }

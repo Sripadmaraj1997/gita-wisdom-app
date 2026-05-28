@@ -5,6 +5,9 @@
 // immediately visible, while long explanations scroll below. Previous/Next
 // controls stay fixed at the bottom. Verse audio is lazy-loaded only after the
 // user taps Play so app startup and chapter navigation never wait on audio.
+//
+// TODO(audio): When licensed recitations are ready, keep the lazy-load behavior
+// and expand the asset pack using the same chapter_verse file convention.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -431,8 +434,9 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
     });
 
     try {
-      // Audio assets are optional. setAsset is inside try/catch so a missing
-      // verse file shows a gentle message instead of crashing the reader.
+      // Audio assets are optional. setAsset happens only after the Play tap and
+      // stays inside try/catch so missing verse files show a gentle message
+      // instead of crashing or blocking scripture reading.
       await player.stop();
       await player.setAsset(assetPath);
       debugPrint('VerseAudio: setAsset complete $assetPath');
@@ -1235,6 +1239,8 @@ bool _hasSourceReflectionOrPractice(
 }
 
 String _verseAudioAssetPath(GitaVerseData verse) {
+  // The app uses a flat chapter_verse convention so generated audio packs can
+  // be copied into assets/audio/gita/ without changing JSON content.
   return 'assets/audio/gita/${verse.chapterNumber}_${verse.verseNumber}.mp3';
 }
 

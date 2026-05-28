@@ -2,7 +2,8 @@
 //
 // Searches local scripture, reflections, Practice Today text, tags, and verse
 // references. Topic chips seed emotional searches such as peace, fear, anger,
-// and attachment. Results always navigate to an exact Verse Reader position.
+// and attachment. Ranking lives in GitaRepository.search so SearchScreen only
+// handles UX state and exact navigation into Verse Reader.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

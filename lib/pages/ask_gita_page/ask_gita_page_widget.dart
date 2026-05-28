@@ -3,6 +3,10 @@
 // This is a retrieval-only MVP: it searches local Gita verses and local journal
 // reflections, then formats calm guidance. It intentionally does not call
 // OpenAI, Firebase, or any backend so it remains fast and available offline.
+//
+// TODO(ai-guidance): A future AI layer can reuse _AskGuidance as the response
+// contract, with retrieved verses/reflections as context and local retrieval as
+// the fallback when no network or API key is available.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -78,8 +82,10 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
     });
 
     try {
-      // Expand emotional wording before searching. This makes questions like
-      // "How do I stop worrying?" retrieve relevant verses without an AI model.
+      // Answer flow:
+      // 1. expand emotional wording into Gita search terms
+      // 2. retrieve the best local verse and private journal match
+      // 3. format a short five-part answer instead of a chat transcript
       final enhancedQuestion = _expandEmotionalQuery(question);
       final verseMatches =
           await GitaRepository.search(enhancedQuestion, limit: 3);
@@ -1015,6 +1021,9 @@ bool _hasUsefulText(String value) {
 }
 
 int _scoreMatch(String question, String haystack) {
+  // Journal matching is intentionally conservative: only direct term overlap is
+  // used, so private notes influence guidance without pretending to be semantic
+  // AI or exposing data outside the device.
   final terms = question
       .toLowerCase()
       .split(RegExp(r'[^a-z0-9]+'))

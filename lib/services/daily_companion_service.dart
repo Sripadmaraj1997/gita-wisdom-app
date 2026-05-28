@@ -3,6 +3,9 @@
 // Provides a small rotating set of local guidance entries used by Home and One
 // Minute Wisdom. Keeping this data in one service avoids duplicating reflection
 // copy across screens and makes future editorial expansion straightforward.
+//
+// TODO(content): Move this editorial list to a versioned local JSON file if the
+// guidance library grows beyond a small hand-curated set.
 class DailyGuidance {
   const DailyGuidance({
     required this.verseId,
@@ -81,6 +84,9 @@ class DailyCompanionService {
   ];
 
   static DailyGuidance todaysGuidance([DateTime? date]) {
+    // The date-based index gives users a fresh daily prompt without storing
+    // server state. It is deterministic, so reopening the app on the same day
+    // shows the same guidance.
     final now = date ?? DateTime.now();
     final dayKey = DateTime(now.year, now.month, now.day)
         .difference(DateTime(now.year, 1, 1))

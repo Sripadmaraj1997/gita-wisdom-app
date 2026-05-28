@@ -1,8 +1,8 @@
 // Home screen for the daily spiritual companion experience.
 //
 // This page intentionally prioritizes a calm daily flow over dashboard density:
-// Continue Reading, Read/Ask actions, Today's Guidance, Daily Verse, recent
-// reflections, and secondary tools. All state is local.
+// arrive, resume reading, choose Read/Ask, receive Today's Guidance, revisit a
+// verse, then use secondary tools. All state is local.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/gita_data.dart';
@@ -31,8 +31,8 @@ class HomePageWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Hero establishes the spiritual identity without containing
-                // primary CTAs; the actual daily actions stay below for clarity.
+                // The hero is emotional arrival only. Primary actions stay
+                // below it so the screen feels guided rather than promotional.
                 const AnimatedEntrance(
                   child: _KrishnaHeroSection(),
                 ),

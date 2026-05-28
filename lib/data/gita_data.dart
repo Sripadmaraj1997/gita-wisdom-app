@@ -5,6 +5,9 @@
 // assets/data/reflections.json, validates the expected 18 chapters / 700 verses,
 // and exposes search/retrieval helpers used by Home, Read, Search, Ask Gita
 // Lite, and Verse Reader.
+//
+// TODO(ai-guidance): Future semantic retrieval can layer embeddings over this
+// repository while keeping the local JSON loader as the offline fallback.
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -788,8 +791,10 @@ class GitaRepository {
     }
 
     // Emotional searches such as "worry" or "attachment" are expanded into
-    // related Gita terms so the offline search feels more spiritually useful
-    // without calling an AI service.
+    // related Gita terms so the offline search feels spiritually useful without
+    // an AI service. Ranking then favors exact references first, followed by
+    // editorial tags/reflections, then scripture text. This mirrors how users
+    // usually search: "2.47" should be exact, while "fear" should find guidance.
     final expandedQuery = _expandSpiritualSearchQuery(normalizedQuery);
     final terms = expandedQuery
         .split(RegExp(r'[\s,;:!?()\[\]"“”‘’]+'))
