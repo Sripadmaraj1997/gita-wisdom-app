@@ -1,3 +1,8 @@
+// Legacy daily habit counter.
+//
+// This predates the gentler "Days of Reflection" flow in LocalStorageService.
+// It remains available for compatibility, but current Home/Journeys UI uses the
+// reflection activity methods so the app avoids aggressive streak messaging.
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HabitStatus {

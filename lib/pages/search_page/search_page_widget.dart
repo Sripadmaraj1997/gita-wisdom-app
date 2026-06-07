@@ -90,7 +90,8 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
       child: ListView(
         key: const PageStorageKey('search_scroll_position'),
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 42),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.only(bottom: gitaBottomNavScrollPadding(context)),
         children: [
           const PageHeader(
             title: 'Search',
@@ -102,6 +103,9 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
             child: Column(
               children: [
                 AnimatedEntrance(
+                  // Search field:
+                  // Free text supports verse references, Sanskrit,
+                  // transliteration, translation words, and practical topics.
                   child: PremiumCard(
                     accent: true,
                     padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
@@ -168,6 +172,9 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                // Emotional topic search:
+                // Topic chips record private reflection activity and send the
+                // same query through the repository ranking logic.
                 _TopicSearchChips(
                   topics: _topicChips,
                   selectedTopic: _query,
@@ -187,6 +194,9 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeOutCubic,
                   child: FutureBuilder<List<GitaSearchResult>>(
+                    // Ranking logic lives in GitaRepository.search. This
+                    // screen only displays loading/error/empty states and maps
+                    // a result tap to VerseReaderScreen.
                     key: ValueKey(_query),
                     future: _searchFuture,
                     builder: (context, snapshot) {
@@ -216,17 +226,21 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                _query.isEmpty
-                                    ? 'Suggested verses'
-                                    : '${results.length} results',
-                                style: gitaBody(
-                                  color: kText,
-                                  size: 17,
-                                  weight: FontWeight.w900,
+                              Expanded(
+                                child: Text(
+                                  _query.isEmpty
+                                      ? 'Suggested verses'
+                                      : '${results.length} results',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: gitaBody(
+                                    color: kText,
+                                    size: 17,
+                                    weight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 10),
                               const AccentPill('Real Gita data'),
                             ],
                           ),
@@ -296,20 +310,24 @@ class _SearchResultCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          _HighlightedSnippet(
-            text: verse.sanskrit,
-            query: query,
-            maxLines: 3,
-            style: gitaSanskrit(21),
-          ),
-          const SizedBox(height: 14),
-          _HighlightedSnippet(
-            text: verse.transliteration,
-            query: query,
-            maxLines: 2,
-            style: gitaTransliteration(size: 14, color: kMuted),
-          ),
-          const SizedBox(height: 14),
+          if (verse.sanskrit.trim().isNotEmpty) ...[
+            _HighlightedSnippet(
+              text: verse.sanskrit,
+              query: query,
+              maxLines: 3,
+              style: gitaSanskrit(21),
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (verse.transliteration.trim().isNotEmpty) ...[
+            _HighlightedSnippet(
+              text: verse.transliteration,
+              query: query,
+              maxLines: 2,
+              style: gitaTransliteration(size: 14, color: kMuted),
+            ),
+            const SizedBox(height: 14),
+          ],
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -329,23 +347,28 @@ class _SearchResultCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
-                _HighlightedSnippet(
-                  text: verse.englishTranslation,
-                  query: query,
-                  style: gitaBody(
-                    color: kDarkText,
-                    size: 16,
-                    weight: FontWeight.w800,
+                if (verse.englishTranslation.trim().isNotEmpty) ...[
+                  _HighlightedSnippet(
+                    text: verse.englishTranslation,
+                    query: query,
+                    style: gitaBody(
+                      color: kDarkText,
+                      size: 16,
+                      weight: FontWeight.w800,
+                    ),
+                    maxLines: 3,
                   ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 10),
-                _PreviewBlock(
-                  label: _secondaryPreviewLabel(verse),
-                  text: _secondaryPreviewText(verse),
-                  query: query,
-                  maxLines: 3,
-                ),
+                ],
+                if (_secondaryPreviewText(verse).trim().isNotEmpty) ...[
+                  if (verse.englishTranslation.trim().isNotEmpty)
+                    const SizedBox(height: 10),
+                  _PreviewBlock(
+                    label: _secondaryPreviewLabel(verse),
+                    text: _secondaryPreviewText(verse),
+                    query: query,
+                    maxLines: 3,
+                  ),
+                ],
               ],
             ),
           ),
@@ -563,7 +586,7 @@ String _secondaryPreviewLabel(GitaVerseData verse) {
   if (practiceToday.isNotEmpty) {
     return 'Practice Today';
   }
-  final meaning = verse.meaning.trim();
+  final meaning = verse.cleanMeaning.trim();
   if (meaning.isNotEmpty) {
     return 'Meaning';
   }
@@ -575,7 +598,7 @@ String _secondaryPreviewText(GitaVerseData verse) {
   if (practiceToday.isNotEmpty) {
     return practiceToday;
   }
-  final meaning = verse.meaning.trim();
+  final meaning = verse.cleanMeaning.trim();
   if (meaning.isNotEmpty) {
     return meaning;
   }

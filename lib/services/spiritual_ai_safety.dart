@@ -1,3 +1,8 @@
+// Safety copy for any future AI-backed spiritual guidance.
+//
+// Ask Gita Lite currently avoids AI/API calls and uses local retrieval only.
+// Keep these constraints available so a future backend integration preserves
+// humility, citation discipline, and professional-advice boundaries.
 class SpiritualAiSafety {
   const SpiritualAiSafety._();
 

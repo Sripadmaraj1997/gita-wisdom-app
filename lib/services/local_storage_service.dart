@@ -398,13 +398,15 @@ class LocalStorageService {
 
   // Storage keys are intentionally namespaced with "gita_" where possible.
   // If cloud sync is added later, these keys define the local cache contract.
+  // TODO(cloud-sync): Move these calls behind a sync repository if accounts are
+  // introduced, while preserving these keys for local-first migration.
   static const savedVersesKey = 'gita_saved_verses';
   static const savedReflectionsKey = 'gita_saved_reflections';
   static const highlightedVersesKey = 'gita_highlighted_verses';
   static const journalEntriesKey = 'gita_journal_entries';
   static const askHistoryKey = 'gita_ask_history';
   static const recentVersesKey = 'gita_recent_verses';
-  static const readingPlanProgressKey = 'gita_reading_plan_progress';
+  static const journeyProgressKey = 'gita_reading_plan_progress';
   static const readerFontScaleKey = 'gita_reader_font_scale';
   static const readerShowSanskritKey = 'gita_reader_show_sanskrit';
   static const readerShowTransliterationKey =
@@ -413,6 +415,9 @@ class LocalStorageService {
   static const recentReflectionsKey = 'gita_recent_reflections';
   static const themeModeKey = 'gita_theme_mode';
 
+  // Saved/highlight storage:
+  // Saved verses store compact snapshots for fast rendering. Highlights store
+  // only IDs because scripture content remains owned by the local Gita JSON.
   static Future<List<LocalSavedVerse>> savedVerses() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -555,6 +560,8 @@ class LocalStorageService {
   }
 
   static Future<List<LocalJournalEntry>> journalEntries() async {
+    // Journal notes are user-authored local data. They are intentionally kept
+    // separate from scripture, translation, meaning, and reflection datasets.
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(journalEntriesKey);
@@ -587,6 +594,7 @@ class LocalStorageService {
       journalEntriesKey,
       updated.map((item) => item.toJson()),
     );
+    await recordJournalReflection();
   }
 
   static Future<void> deleteJournalEntry(String id) async {
@@ -715,11 +723,23 @@ class LocalStorageService {
   static Future<void> recordDailyGuidanceOpened() async {
     // Opening Today's Guidance counts as a gentle reflection day. This is
     // intentionally low-pressure; there are no badges, reminders, or penalties.
-    await _recordPracticeDate(DateTime.now());
+    await recordReflectionActivity();
+  }
+
+  static Future<void> recordVerseReadForReflection() async {
+    await recordReflectionActivity();
+  }
+
+  static Future<void> recordJournalReflection() async {
+    await recordReflectionActivity();
   }
 
   static Future<void> recordPracticeCompleted() async {
-    await _recordPracticeDate(DateTime.now());
+    await recordReflectionActivity();
+  }
+
+  static Future<void> recordReflectionActivity() async {
+    await _recordReflectionDate(DateTime.now());
   }
 
   static Future<int> reflectionStreak() async {
@@ -750,7 +770,7 @@ class LocalStorageService {
     return (prefs.getStringList(completedPracticeDatesKey) ?? const []).toSet();
   }
 
-  static Future<void> _recordPracticeDate(DateTime date) async {
+  static Future<void> _recordReflectionDate(DateTime date) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final dates = await _completedPracticeDates();
@@ -796,7 +816,7 @@ class LocalStorageService {
     await prefs.remove(journalEntriesKey);
     await prefs.remove(askHistoryKey);
     await prefs.remove(recentVersesKey);
-    await prefs.remove(readingPlanProgressKey);
+    await prefs.remove(journeyProgressKey);
     await prefs.remove(readerFontScaleKey);
     await prefs.remove(readerShowSanskritKey);
     await prefs.remove(readerShowTransliterationKey);
@@ -891,9 +911,12 @@ class LocalStorageService {
   }
 
   static Future<Map<String, Set<int>>> readingPlanProgress() async {
+    // Journey progress:
+    // The old method name remains for backwards compatibility with existing
+    // installs, but the user-facing feature is now consistently "Journeys".
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(readingPlanProgressKey);
+      final raw = prefs.getString(journeyProgressKey);
       if (raw == null || raw.isEmpty) {
         return <String, Set<int>>{};
       }
@@ -908,7 +931,7 @@ class LocalStorageService {
         return MapEntry(key, days);
       });
     } catch (error, stackTrace) {
-      debugPrint('Reading plan progress load failed: $error');
+      debugPrint('Journey progress load failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       return <String, Set<int>>{};
     }
@@ -917,6 +940,14 @@ class LocalStorageService {
   static Future<Set<int>> completedReadingPlanDays(String planId) async {
     final progress = await readingPlanProgress();
     return progress[planId] ?? <int>{};
+  }
+
+  static Future<Map<String, Set<int>>> journeyProgress() {
+    return readingPlanProgress();
+  }
+
+  static Future<Set<int>> completedJourneyDays(String journeyId) {
+    return completedReadingPlanDays(journeyId);
   }
 
   static Future<void> setReadingPlanDayComplete({
@@ -937,12 +968,24 @@ class LocalStorageService {
       final json = progress.map(
         (key, value) => MapEntry(key, value.toList()..sort()),
       );
-      await prefs.setString(readingPlanProgressKey, jsonEncode(json));
+      await prefs.setString(journeyProgressKey, jsonEncode(json));
     } catch (error, stackTrace) {
-      debugPrint('Reading plan progress save failed: $error');
+      debugPrint('Journey progress save failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       rethrow;
     }
+  }
+
+  static Future<void> setJourneyDayComplete({
+    required String journeyId,
+    required int day,
+    required bool complete,
+  }) {
+    return setReadingPlanDayComplete(
+      planId: journeyId,
+      day: day,
+      complete: complete,
+    );
   }
 
   static Future<void> _saveJsonList(

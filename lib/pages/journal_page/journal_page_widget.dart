@@ -70,9 +70,9 @@ class _JournalPageWidgetState extends State<JournalPageWidget> {
   String get _dailyPrompt {
     const prompts = [
       'What disturbed your peace today?',
-      'What attachment are you holding onto?',
+      'What attachment can you soften today?',
       'What gave you clarity today?',
-      'What duty can you do with love today?',
+      'Where can you act with more steadiness?',
     ];
     final now = DateTime.now();
     final dayKey = DateTime(now.year, now.month, now.day)
@@ -90,7 +90,8 @@ class _JournalPageWidgetState extends State<JournalPageWidget> {
       child: ListView(
         key: const PageStorageKey('journal_scroll_position'),
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 42),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.only(bottom: gitaBottomNavScrollPadding(context)),
         children: [
           PageHeader(
             title: 'Journal',
@@ -476,6 +477,8 @@ class _JournalEditorSheetState extends State<_JournalEditorSheet> {
         child: SafeArea(
           top: false,
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.only(bottom: 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

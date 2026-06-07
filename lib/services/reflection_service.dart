@@ -4,8 +4,8 @@
 // assets/data/reflections.json. This service is deliberately separate from the
 // main Gita dataset so editorial reflections can be updated independently.
 //
-// TODO(content): If reflections become community-authored, validate and bundle
-// a reviewed local export here rather than loading untrusted text at runtime.
+// TODO(community-backend): If reflections become community-authored, validate
+// and bundle a reviewed local export rather than loading untrusted text.
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

@@ -25,6 +25,18 @@ const kDeepBrinjal = design.AppColors.deepBrinjal;
 const kPeacockTeal = design.AppColors.peacockTeal;
 const kPeacockBlue = design.AppColors.peacockBlue;
 
+const kBottomNavigationBarHeight = 84.0;
+const kFixedBottomControlsHeight = 96.0;
+
+double gitaBottomNavScrollPadding(BuildContext context) =>
+    kBottomNavigationBarHeight + MediaQuery.of(context).viewPadding.bottom + 24;
+
+double gitaFixedControlsScrollPadding(
+  BuildContext context, {
+  double controlsHeight = kFixedBottomControlsHeight,
+}) =>
+    controlsHeight + MediaQuery.of(context).viewPadding.bottom + 24;
+
 class GitaChapter {
   const GitaChapter(
       this.number, this.title, this.englishTitle, this.verses, this.theme);
@@ -97,11 +109,15 @@ const savedVerses = [
 TextStyle gitaTitle(double size) => design.AppTextStyles.title(size: size);
 
 TextStyle gitaBody({
-  double size = 14,
+  double size = 16,
   Color color = kMuted,
   FontWeight weight = FontWeight.w500,
 }) =>
-    design.AppTextStyles.body(size: size, color: color, weight: weight);
+    design.AppTextStyles.body(
+      size: size < 16 ? 16 : size,
+      color: color,
+      weight: weight,
+    );
 
 TextStyle gitaSanskrit(double size) => design.AppTextStyles.sanskrit(size);
 
@@ -174,9 +190,9 @@ class GitaBottomNav extends StatelessWidget {
         '/journalPage',
       ),
       (
-        'Profile',
-        Icons.person_outline,
-        Icons.person,
+        'Settings',
+        Icons.settings_outlined,
+        Icons.settings_rounded,
         '/settingsPage',
       ),
     ];
@@ -408,20 +424,40 @@ class AccentPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(100),
         border: Border.all(color: kGold.withValues(alpha: 0.24)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.spa_rounded, size: 12, color: kSoftGold),
-          const SizedBox(width: 5),
-          Text(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final label = Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: gitaBody(
               size: 12,
               color: kText,
               weight: FontWeight.w800,
             ),
-          ),
-        ],
+          );
+          if (constraints.maxWidth.isFinite) {
+            return Row(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                const Icon(Icons.spa_rounded, size: 12, color: kSoftGold),
+                const SizedBox(width: 5),
+                Expanded(child: label),
+              ],
+            );
+          }
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.spa_rounded, size: 12, color: kSoftGold),
+              const SizedBox(width: 5),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 86),
+                child: label,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -489,7 +525,7 @@ class SpiritualIconPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: label ?? 'Spiritual icon placeholder',
+      label: label ?? 'Spiritual icon',
       child: Container(
         width: size,
         height: size,

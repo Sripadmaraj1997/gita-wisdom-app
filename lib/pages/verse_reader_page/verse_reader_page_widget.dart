@@ -6,8 +6,8 @@
 // controls stay fixed at the bottom. Verse audio is lazy-loaded only after the
 // user taps Play so app startup and chapter navigation never wait on audio.
 //
-// TODO(audio): When licensed recitations are ready, keep the lazy-load behavior
-// and expand the asset pack using the same chapter_verse file convention.
+// TODO(licensed-full-audio): When licensed recitations are ready, keep the
+// lazy-load behavior and expand the asset pack with this file convention.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -45,6 +45,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
   double _fontSize = 1;
   bool _showSanskrit = true;
   bool _showTransliteration = true;
+  bool _isFocusMode = false;
   bool _isSaving = false;
   bool _isHighlighting = false;
   String? _lastSavedProgressVerseId;
@@ -74,6 +75,9 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
   Widget build(BuildContext context) {
     return GitaScaffold(
       child: FutureBuilder<GitaDataBundle>(
+        // Verse loading:
+        // The whole local dataset is loaded once for this screen instance so
+        // swipe navigation can move between verses without reparsing JSON.
         future: _bundleFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -141,16 +145,16 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
             top: false,
             child: Column(
               children: [
-                PageHeader(
+                _ReaderTopBar(
                   title: currentChapter == null
                       ? 'Chapter ${currentVerse.chapterNumber}'
                       : 'Chapter ${currentChapter.chapterNumber}: ${currentChapter.title}',
-                  subtitle:
-                      'Verse ${_currentIndex! + 1} of ${chapterVerses.length}',
-                  showBack: true,
                 ),
                 Expanded(
                   child: PageView.builder(
+                    // Previous / next navigation:
+                    // PageView owns horizontal verse movement while the fixed
+                    // bottom controls call the same controller for button users.
                     controller: _pageController,
                     physics: const BouncingScrollPhysics(),
                     itemCount: chapterVerses.length,
@@ -166,11 +170,14 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                     },
                     itemBuilder: (context, index) {
                       final verse = chapterVerses[index];
-                      final chapter =
-                          bundle.chapterByNumber(verse.chapterNumber);
-                      final pageBottomPadding =
-                          index == chapterVerses.length - 1 ? 360.0 : 150.0;
+                      final pageBottomPadding = gitaFixedControlsScrollPadding(
+                        context,
+                        controlsHeight:
+                            index == chapterVerses.length - 1 ? 300 : 110,
+                      );
                       return SingleChildScrollView(
+                        // Scroll padding keeps Translation, Reflection, and
+                        // Practice Today clear of fixed navigation controls.
                         padding: EdgeInsets.fromLTRB(
                           20,
                           0,
@@ -188,13 +195,17 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                                 ),
                                 builder: (context, highlightSnapshot) {
                                   return _VerseContentCard(
+                                    // Sanskrit / transliteration / translation
+                                    // layout is centralized in this card. It
+                                    // receives reader preferences and action
+                                    // callbacks but does not load data itself.
                                     verse: verse,
-                                    chapter: chapter,
                                     currentIndex: index,
                                     totalVerses: chapterVerses.length,
                                     fontSize: _fontSize,
                                     showSanskrit: _showSanskrit,
                                     showTransliteration: _showTransliteration,
+                                    isFocusMode: _isFocusMode,
                                     isHighlighted:
                                         highlightSnapshot.data ?? false,
                                     isSavedBusy: _isSaving,
@@ -209,6 +220,8 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                                     isAudioLoading: _isAudioLoading,
                                     onAudioToggle: () =>
                                         _toggleVerseAudio(verse),
+                                    onFocusModeChanged: (value) =>
+                                        setState(() => _isFocusMode = value),
                                     onFontSizeChanged: _setFontSize,
                                     onSanskritChanged: (value) {
                                       setState(() => _showSanskrit = value);
@@ -244,6 +257,9 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Fixed previous/next controls remain outside the scroll
+                      // view. The page content reserves bottom padding so the
+                      // last card is never hidden behind them.
                       _VerseNavigationBar(
                         canGoPrevious: _currentIndex! > 0,
                         canGoNext: _currentIndex! < chapterVerses.length - 1,
@@ -371,6 +387,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
     // without writing to shared_preferences on every rebuild.
     _lastSavedProgressVerseId = verse.id;
     await ReadingProgressService.saveVerse(verse);
+    await LocalStorageService.recordVerseReadForReflection();
     await LocalStorageService.recordRecentVerse(verse);
   }
 
@@ -397,6 +414,12 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
   }
 
   Future<void> _toggleVerseAudio(GitaVerseData verse) async {
+    final assetPath = _verseAudioAssetPath(verse);
+    final hasAudio = await _verseAudioAssetExists(assetPath);
+    if (!hasAudio) {
+      return;
+    }
+
     final player = _audioPlayer();
     final isCurrentVerse = _selectedAudioVerseId == verse.id;
     final state = player.playerState.processingState;
@@ -425,7 +448,6 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
       return;
     }
 
-    final assetPath = _verseAudioAssetPath(verse);
     debugPrint('VerseAudio: loading start $assetPath');
     HapticFeedback.selectionClick();
     setState(() {
@@ -457,7 +479,6 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
         setState(() {
           _selectedAudioVerseId = null;
         });
-        _showMessage('Audio not available for this verse yet.');
       }
     } finally {
       if (mounted) {
@@ -585,6 +606,42 @@ GitaVerseData? _firstVerseOrNull(Iterable<GitaVerseData> verses) {
   return null;
 }
 
+class _ReaderTopBar extends StatelessWidget {
+  const _ReaderTopBar({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+      child: Row(
+        children: [
+          AnimatedGoldIconButton(
+            icon: Icons.arrow_back_rounded,
+            tooltip: 'Back',
+            backgroundColor: kCard2,
+            onTap: () =>
+                context.canPop() ? context.pop() : context.go('/homePage'),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: gitaTitle(22).copyWith(
+                color: kAntiqueGold,
+                height: 1.15,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReaderControls extends StatelessWidget {
   const _ReaderControls({
     required this.fontSize,
@@ -612,11 +669,15 @@ class _ReaderControls extends StatelessWidget {
             children: [
               const Icon(Icons.format_size_rounded, color: kGold, size: 18),
               const SizedBox(width: 8),
-              Text(
-                'Reader settings',
-                style: gitaBody(color: kText, weight: FontWeight.w900),
+              Expanded(
+                child: Text(
+                  'Reader settings',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: gitaBody(color: kText, weight: FontWeight.w900),
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 10),
               AccentPill('${(fontSize * 100).round()}%'),
             ],
           ),
@@ -695,12 +756,17 @@ class _ReaderToggleChip extends StatelessWidget {
           children: [
             Icon(icon, color: selected ? kSoftGold : kText, size: 16),
             const SizedBox(width: 7),
-            Text(
-              label,
-              style: gitaBody(
-                color: selected ? kSoftGold : kText,
-                size: 12,
-                weight: FontWeight.w900,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 124),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: gitaBody(
+                  color: selected ? kSoftGold : kText,
+                  size: 12,
+                  weight: FontWeight.w900,
+                ),
               ),
             ),
           ],
@@ -713,12 +779,12 @@ class _ReaderToggleChip extends StatelessWidget {
 class _VerseContentCard extends StatelessWidget {
   const _VerseContentCard({
     required this.verse,
-    required this.chapter,
     required this.currentIndex,
     required this.totalVerses,
     required this.fontSize,
     required this.showSanskrit,
     required this.showTransliteration,
+    required this.isFocusMode,
     required this.isHighlighted,
     required this.isSavedBusy,
     required this.isHighlightBusy,
@@ -729,18 +795,19 @@ class _VerseContentCard extends StatelessWidget {
     required this.selectedAudioVerseId,
     required this.isAudioLoading,
     required this.onAudioToggle,
+    required this.onFocusModeChanged,
     required this.onFontSizeChanged,
     required this.onSanskritChanged,
     required this.onTransliterationChanged,
   });
 
   final GitaVerseData verse;
-  final GitaChapterData? chapter;
   final int currentIndex;
   final int totalVerses;
   final double fontSize;
   final bool showSanskrit;
   final bool showTransliteration;
+  final bool isFocusMode;
   final bool isHighlighted;
   final bool isSavedBusy;
   final bool isHighlightBusy;
@@ -751,33 +818,57 @@ class _VerseContentCard extends StatelessWidget {
   final String? selectedAudioVerseId;
   final bool isAudioLoading;
   final VoidCallback onAudioToggle;
+  final ValueChanged<bool> onFocusModeChanged;
   final ValueChanged<double> onFontSizeChanged;
   final ValueChanged<bool> onSanskritChanged;
   final ValueChanged<bool> onTransliterationChanged;
 
   @override
   Widget build(BuildContext context) {
-    // Layout order is deliberate: reference, Sanskrit, transliteration, and the
-    // compact action row appear before longer translation/commentary content.
-    return PremiumCard(
-      accent: false,
-      padding: const EdgeInsets.all(14),
+    // Layout order is deliberate: reading content comes first, then compact
+    // actions, then study notes.
+    final sanskrit = verse.sanskrit.trim();
+    final transliteration = verse.transliteration.trim();
+    final translation = verse.englishTranslation.trim();
+    final meaning = verse.cleanMeaning;
+    final progressValue =
+        totalVerses <= 0 ? 0.0 : (currentIndex + 1) / totalVerses;
+    final isCompactHeight = MediaQuery.sizeOf(context).height < 700;
+    final sanskritSize = (isCompactHeight ? 23.0 : 28.0) * fontSize;
+    final transliterationSize = (isCompactHeight ? 16.0 : 18.0) * fontSize;
+    final sanskritMaxHeight = isCompactHeight ? 108.0 : 190.0;
+    final transliterationMaxHeight = isCompactHeight ? 68.0 : 128.0;
+    final sectionGap = isCompactHeight ? 12.0 : 18.0;
+    final translationGap = isCompactHeight ? 14.0 : 22.0;
+    final content = PremiumCard(
+      accent: true,
+      padding: EdgeInsets.zero,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
-        padding: const EdgeInsets.all(16),
+        key: ValueKey('${verse.id}-$isFocusMode'),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          color: kCream,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              kNavy.withValues(alpha: 0.98),
+              kCard.withValues(alpha: 0.98),
+              kDeepBrinjal.withValues(alpha: 0.96),
+            ],
+          ),
           border: Border.all(
             color: isHighlighted
-                ? kGold.withValues(alpha: 0.72)
-                : kGold.withValues(alpha: 0.22),
-            width: isHighlighted ? 2 : 1,
+                ? kGold.withValues(alpha: 0.70)
+                : kGold.withValues(alpha: 0.28),
+            width: isHighlighted ? 1.6 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: kGold.withValues(alpha: isHighlighted ? 0.30 : 0.16),
-              blurRadius: isHighlighted ? 34 : 26,
+              color: kGold.withValues(alpha: isHighlighted ? 0.26 : 0.12),
+              blurRadius: isHighlighted ? 30 : 22,
               offset: const Offset(0, 12),
             ),
           ],
@@ -785,61 +876,64 @@ class _VerseContentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                AccentPill(verse.reference),
-                if (isHighlighted) ...[
-                  const SizedBox(width: 8),
-                  const AccentPill('Highlighted'),
-                ],
-                const Spacer(),
-                Text(
-                  'Verse ${currentIndex + 1} of $totalVerses',
-                  style: gitaBody(
-                    color: kDarkText.withValues(alpha: 0.68),
-                    size: 12,
-                    weight: FontWeight.w900,
-                  ),
-                ),
-              ],
+            _ReadingProgressHeader(
+              chapterNumber: verse.chapterNumber,
+              verseNumber: currentIndex + 1,
+              totalVerses: totalVerses,
+              progressValue: progressValue,
+              isFocusMode: isFocusMode,
+              onFocusToggle: () => onFocusModeChanged(!isFocusMode),
             ),
-            const SizedBox(height: 12),
-            if (showSanskrit) ...[
-              _VerseSection(
-                label: 'Sanskrit',
-                child: PurpleVerseCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    verse.sanskrit,
-                    style: gitaSanskrit(24 * fontSize).copyWith(
-                      color: kAntiqueGold,
-                      height: 1.48,
-                      shadows: [
-                        Shadow(
-                          color: kGold.withValues(alpha: 0.36),
-                          blurRadius: 18,
-                        ),
-                      ],
+            const SizedBox(height: 18),
+            // Reading-first layout:
+            // Sanskrit and transliteration are shown exactly from local JSON
+            // when available. Missing fields are hidden instead of replaced
+            // with generated or placeholder text.
+            if (showSanskrit && sanskrit.isNotEmpty) ...[
+              _ResponsiveReaderText(
+                text: sanskrit,
+                maxHeight: sanskritMaxHeight,
+                style: gitaSanskrit(sanskritSize).copyWith(
+                  color: kAntiqueGold,
+                  height: isCompactHeight ? 1.58 : 1.78,
+                  letterSpacing: 0,
+                  shadows: [
+                    Shadow(
+                      color: kGold.withValues(alpha: 0.18),
+                      blurRadius: 18,
                     ),
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: sectionGap),
             ],
-            if (showTransliteration) ...[
-              _VerseSection(
-                label: 'Transliteration',
-                child: Text(
-                  verse.transliteration,
-                  style: gitaTransliteration(
-                    size: 16 * fontSize,
-                    color: kDarkText.withValues(alpha: 0.78),
-                  ).copyWith(height: 1.46),
+            if (showTransliteration && transliteration.isNotEmpty) ...[
+              _ResponsiveReaderText(
+                text: transliteration,
+                maxHeight: transliterationMaxHeight,
+                style: gitaTransliteration(
+                  size: transliterationSize,
+                  color: kText.withValues(alpha: 0.92),
+                ).copyWith(
+                  height: isCompactHeight ? 1.45 : 1.65,
+                  letterSpacing: 0,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: translationGap),
+            ],
+            if (translation.isNotEmpty) ...[
+              // Translation is separated into a cream reading card so long
+              // English text stays readable over the dark devotional surface.
+              _TranslationReadingCard(
+                translation: translation,
+                fontSize: fontSize,
+              ),
+              const SizedBox(height: 14),
             ],
             _VerseBottomActions(
+              // Compact action row:
+              // Save, share, highlight, and audio stay below the primary
+              // reading content and never become a separate vertical panel.
               verse: verse,
               isSavedBusy: isSavedBusy,
               isHighlightBusy: isHighlightBusy,
@@ -851,41 +945,287 @@ class _VerseContentCard extends StatelessWidget {
               isAudioLoading: isAudioLoading,
               onAudioToggle: onAudioToggle,
             ),
-            const SizedBox(height: 18),
-            _VerseSection(
-              label: 'English Translation',
-              child: Text(
-                verse.englishTranslation,
+            if (!isFocusMode) ...[
+              const SizedBox(height: 24),
+              const _ElegantDivider(),
+              const SizedBox(height: 22),
+              if (meaning.isNotEmpty) ...[
+                // Reflection flow:
+                // Meaning, Reflection, and Practice Today stay as separate
+                // study cards so translation never blends into commentary.
+                _MeaningPanel(
+                  meaning: meaning,
+                  fontSize: fontSize,
+                ),
+                const SizedBox(height: 16),
+              ],
+              _ReflectionAndPracticePanels(
+                verse: verse,
+                fontSize: fontSize,
+              ),
+              const SizedBox(height: 18),
+              _ReaderControls(
+                fontSize: fontSize,
+                showSanskrit: showSanskrit,
+                showTransliteration: showTransliteration,
+                onFontSizeChanged: onFontSizeChanged,
+                onSanskritChanged: onSanskritChanged,
+                onTransliterationChanged: onTransliterationChanged,
+              ),
+            ] else ...[
+              const SizedBox(height: 14),
+              Text(
+                'Tap anywhere on this card to return to full view.',
+                textAlign: TextAlign.center,
                 style: gitaBody(
-                  color: kDarkText,
-                  size: 19 * fontSize,
-                  weight: FontWeight.w800,
-                ).copyWith(height: 1.56),
+                  color: kMuted.withValues(alpha: 0.86),
+                  size: 13,
+                  weight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+    if (!isFocusMode) {
+      return content;
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onFocusModeChanged(false),
+      child: content,
+    );
+  }
+}
+
+class _ReadingProgressHeader extends StatelessWidget {
+  const _ReadingProgressHeader({
+    required this.chapterNumber,
+    required this.verseNumber,
+    required this.totalVerses,
+    required this.progressValue,
+    required this.isFocusMode,
+    required this.onFocusToggle,
+  });
+
+  final int chapterNumber;
+  final int verseNumber;
+  final int totalVerses;
+  final double progressValue;
+  final bool isFocusMode;
+  final VoidCallback onFocusToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Chapter $chapterNumber • Verse $verseNumber of $totalVerses',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: gitaBody(
+                  color: kText.withValues(alpha: 0.86),
+                  size: 13,
+                  weight: FontWeight.w900,
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-            _CommentaryPanel(
-              chapter: chapter,
-              verse: verse,
-              fontSize: fontSize,
+            const SizedBox(width: 10),
+            _FocusModeButton(
+              isFocusMode: isFocusMode,
+              onTap: onFocusToggle,
             ),
-            const SizedBox(height: 16),
-            _ReflectionAndPracticePanels(
-              verse: verse,
-              fontSize: fontSize,
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(100),
+          child: LinearProgressIndicator(
+            value: progressValue.clamp(0.0, 1.0),
+            minHeight: 3,
+            backgroundColor: kGold.withValues(alpha: 0.14),
+            valueColor: AlwaysStoppedAnimation(
+              kAntiqueGold.withValues(alpha: 0.88),
             ),
-            const SizedBox(height: 18),
-            _ReaderControls(
-              fontSize: fontSize,
-              showSanskrit: showSanskrit,
-              showTransliteration: showTransliteration,
-              onFontSizeChanged: onFontSizeChanged,
-              onSanskritChanged: onSanskritChanged,
-              onTransliterationChanged: onTransliterationChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ResponsiveReaderText extends StatelessWidget {
+  const _ResponsiveReaderText({
+    required this.text,
+    required this.style,
+    required this.maxHeight,
+  });
+
+  final String text;
+  final TextStyle style;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: width,
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                textWidthBasis: TextWidthBasis.parent,
+                style: style,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FocusModeButton extends StatelessWidget {
+  const _FocusModeButton({
+    required this.isFocusMode,
+    required this.onTap,
+  });
+
+  final bool isFocusMode;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(100),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        decoration: BoxDecoration(
+          color: isFocusMode
+              ? kGold.withValues(alpha: 0.22)
+              : kCard2.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: kGold.withValues(alpha: 0.26)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isFocusMode
+                  ? Icons.visibility_rounded
+                  : Icons.visibility_outlined,
+              color: kAntiqueGold,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isFocusMode ? 'Full view' : 'Focus',
+              style: gitaBody(
+                color: kText,
+                size: 12,
+                weight: FontWeight.w900,
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TranslationReadingCard extends StatelessWidget {
+  const _TranslationReadingCard({
+    required this.translation,
+    required this.fontSize,
+  });
+
+  final String translation;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      decoration: BoxDecoration(
+        color: kCream,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: kGold.withValues(alpha: 0.22)),
+        boxShadow: [
+          BoxShadow(
+            color: kGold.withValues(alpha: 0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Translation',
+            style: gitaBody(
+              color: kRoyalPurple,
+              size: 13,
+              weight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            translation,
+            style: gitaBody(
+              color: kDarkText,
+              size: 18 * fontSize,
+              weight: FontWeight.w800,
+            ).copyWith(height: 1.7),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ElegantDivider extends StatelessWidget {
+  const _ElegantDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: kGold.withValues(alpha: 0.16),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Icon(
+            Icons.spa_rounded,
+            color: kGold.withValues(alpha: 0.42),
+            size: 16,
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: kGold.withValues(alpha: 0.16),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -901,8 +1241,8 @@ class _ReflectionAndPracticePanels extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Reflections are optional editorial content. Practice Today always renders
-    // with a fallback so every verse has an actionable takeaway.
+    // Reflections and practices are optional local study notes. Missing content
+    // is hidden rather than replaced with synthetic copy.
     return FutureBuilder<VerseReflectionData?>(
       future: ReflectionService.reflectionForVerse(
         chapterNumber: verse.chapterNumber,
@@ -927,17 +1267,18 @@ class _ReflectionAndPracticePanels extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (reflectionText.isNotEmpty) ...[
-              const SizedBox(height: 16),
               _ReflectionPanel(
                 reflection: reflectionText,
                 fontSize: fontSize,
               ),
             ],
-            const SizedBox(height: 16),
-            _PracticeTodayPanel(
-              practiceToday: practiceText,
-              fontSize: fontSize,
-            ),
+            if (practiceText.isNotEmpty) ...[
+              if (reflectionText.isNotEmpty) const SizedBox(height: 16),
+              _PracticeTodayPanel(
+                practiceToday: practiceText,
+                fontSize: fontSize,
+              ),
+            ],
             if (canSave) ...[
               const SizedBox(height: 12),
               _SaveReflectionButton(
@@ -1013,51 +1354,17 @@ class _SaveReflectionButtonState extends State<_SaveReflectionButton> {
   }
 }
 
-class _VerseSection extends StatelessWidget {
-  const _VerseSection({
-    required this.label,
-    required this.child,
-  });
-
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: gitaBody(
-            color: kRoyalPurple,
-            size: 11,
-            weight: FontWeight.w900,
-          ).copyWith(letterSpacing: 0.35),
-        ),
-        const SizedBox(height: 11),
-        child,
-      ],
-    );
-  }
-}
-
-class _CommentaryPanel extends StatelessWidget {
-  const _CommentaryPanel({
-    required this.chapter,
-    required this.verse,
+class _MeaningPanel extends StatelessWidget {
+  const _MeaningPanel({
+    required this.meaning,
     required this.fontSize,
   });
 
-  final GitaChapterData? chapter;
-  final GitaVerseData verse;
+  final String meaning;
   final double fontSize;
 
   @override
   Widget build(BuildContext context) {
-    final text = verse.meaning.trim().isEmpty
-        ? 'Reflect on this verse as guidance for steady action, inner clarity, and peaceful living.'
-        : verse.meaning;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1080,13 +1387,19 @@ class _CommentaryPanel extends StatelessWidget {
             children: [
               const Icon(Icons.notes_rounded, color: kGold, size: 18),
               const SizedBox(width: 8),
-              Text('Meaning / Commentary',
-                  style: gitaBody(color: kDarkText, weight: FontWeight.w900)),
+              Expanded(
+                child: Text(
+                  'Meaning',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: gitaBody(color: kDarkText, weight: FontWeight.w900),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 13),
           Text(
-            text,
+            meaning,
             softWrap: true,
             style: gitaBody(color: kDarkText, size: 16.5 * fontSize).copyWith(
               height: 1.64,
@@ -1125,9 +1438,13 @@ class _ReflectionPanel extends StatelessWidget {
               const Icon(Icons.lightbulb_outline_rounded,
                   color: kGold, size: 18),
               const SizedBox(width: 8),
-              Text(
-                'Reflection',
-                style: gitaBody(color: kDarkText, weight: FontWeight.w900),
+              Expanded(
+                child: Text(
+                  'Reflection',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: gitaBody(color: kDarkText, weight: FontWeight.w900),
+                ),
               ),
             ],
           ),
@@ -1180,9 +1497,13 @@ class _PracticeTodayPanel extends StatelessWidget {
             children: [
               const Icon(Icons.spa_rounded, color: kGold, size: 18),
               const SizedBox(width: 8),
-              Text(
-                'Practice Today',
-                style: gitaBody(color: kDarkText, weight: FontWeight.w900),
+              Expanded(
+                child: Text(
+                  'Practice Today',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: gitaBody(color: kDarkText, weight: FontWeight.w900),
+                ),
               ),
             ],
           ),
@@ -1225,7 +1546,7 @@ String _effectivePracticeText(
     return versePractice;
   }
 
-  return 'Pause, reflect, and carry one insight from this verse into your day.';
+  return '';
 }
 
 bool _hasSourceReflectionOrPractice(
@@ -1242,6 +1563,28 @@ String _verseAudioAssetPath(GitaVerseData verse) {
   // The app uses a flat chapter_verse convention so generated audio packs can
   // be copied into assets/audio/gita/ without changing JSON content.
   return 'assets/audio/gita/${verse.chapterNumber}_${verse.verseNumber}.mp3';
+}
+
+Future<Set<String>>? _verseAudioAssetManifestFuture;
+
+Future<Set<String>> _verseAudioAssetPaths() {
+  // AssetManifest is the source of truth for packaged Flutter assets. Checking
+  // it before showing Play avoids a broken-feeling loading/error state for
+  // verses whose audio has not been produced yet.
+  return _verseAudioAssetManifestFuture ??=
+      AssetManifest.loadFromAssetBundle(rootBundle)
+          .then((manifest) => manifest.listAssets().toSet());
+}
+
+Future<bool> _verseAudioAssetExists(String assetPath) async {
+  try {
+    final assets = await _verseAudioAssetPaths();
+    return assets.contains(assetPath);
+  } catch (error, stackTrace) {
+    debugPrint('Verse audio asset manifest check failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    return false;
+  }
 }
 
 class _VerseNavigationBar extends StatelessWidget {
@@ -1485,6 +1828,11 @@ class _VerseBottomActions extends StatelessWidget {
                 label: 'Share',
                 onTap: onShare,
               ),
+              _HighlightActionChip(
+                verse: verse,
+                isHighlighting: isHighlightBusy,
+                onHighlightingChanged: onHighlightingChanged,
+              ),
               _VerseAudioControl(
                 verse: verse,
                 player: player,
@@ -1492,77 +1840,10 @@ class _VerseBottomActions extends StatelessWidget {
                 isAudioLoading: isAudioLoading,
                 onTap: onAudioToggle,
               ),
-              _HighlightActionChip(
-                verse: verse,
-                isHighlighting: isHighlightBusy,
-                onHighlightingChanged: onHighlightingChanged,
-              ),
             ],
-          ),
-          _VerseAudioProgress(
-            verse: verse,
-            player: player,
-            selectedAudioVerseId: selectedAudioVerseId,
           ),
         ],
       ),
-    );
-  }
-}
-
-class _VerseAudioProgress extends StatelessWidget {
-  const _VerseAudioProgress({
-    required this.verse,
-    required this.player,
-    required this.selectedAudioVerseId,
-  });
-
-  final GitaVerseData verse;
-  final AudioPlayer? player;
-  final String? selectedAudioVerseId;
-
-  @override
-  Widget build(BuildContext context) {
-    // The progress line is intentionally subtle and only appears after a valid
-    // duration is known. It never reserves space for verses without audio.
-    final audioPlayer = player;
-    if (audioPlayer == null || selectedAudioVerseId != verse.id) {
-      return const SizedBox.shrink();
-    }
-
-    return StreamBuilder<Duration?>(
-      stream: audioPlayer.durationStream,
-      initialData: audioPlayer.duration,
-      builder: (context, durationSnapshot) {
-        final duration = durationSnapshot.data;
-        if (duration == null || duration.inMilliseconds <= 0) {
-          return const SizedBox.shrink();
-        }
-        return StreamBuilder<Duration>(
-          stream: audioPlayer.positionStream,
-          initialData: audioPlayer.position,
-          builder: (context, positionSnapshot) {
-            final position = positionSnapshot.data ?? Duration.zero;
-            final progress = (position.inMilliseconds / duration.inMilliseconds)
-                .clamp(0.0, 1.0);
-            return SizedBox(
-              width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(100),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 3,
-                    backgroundColor: kGold.withValues(alpha: 0.16),
-                    valueColor: const AlwaysStoppedAnimation(kGold),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }
@@ -1586,35 +1867,57 @@ class _VerseAudioControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final audioPlayer = player;
-    if (audioPlayer == null || !_isSelected) {
-      return _VerseActionChip(
-        icon: Icons.play_arrow_rounded,
-        label: 'Play',
-        isBusy: isAudioLoading && _isSelected,
-        onTap: onTap,
-      );
-    }
+    return FutureBuilder<bool>(
+      future: _verseAudioAssetExists(_verseAudioAssetPath(verse)),
+      builder: (context, availabilitySnapshot) {
+        final hasAudio = availabilitySnapshot.data ?? false;
+        if (availabilitySnapshot.connectionState != ConnectionState.done) {
+          return const _VerseActionChip(
+            icon: Icons.music_note_rounded,
+            label: 'Audio',
+            isBusy: true,
+            onTap: null,
+          );
+        }
+        if (!hasAudio) {
+          return const _VerseActionChip(
+            icon: Icons.music_off_rounded,
+            label: 'Audio',
+            onTap: null,
+          );
+        }
 
-    return StreamBuilder<PlayerState>(
-      stream: audioPlayer.playerStateStream,
-      initialData: audioPlayer.playerState,
-      builder: (context, stateSnapshot) {
-        final state = stateSnapshot.data ?? audioPlayer.playerState;
-        final isPlaying = state.playing;
-        final isBusy = isAudioLoading ||
-            state.processingState == ProcessingState.loading ||
-            state.processingState == ProcessingState.buffering;
-        return _VerseActionChip(
-          icon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          label: isBusy
-              ? 'Loading'
-              : isPlaying
-                  ? 'Pause'
-                  : 'Play',
-          selected: isPlaying,
-          isBusy: isBusy,
-          onTap: isBusy ? null : onTap,
+        final audioPlayer = player;
+        if (audioPlayer == null || !_isSelected) {
+          return _VerseActionChip(
+            icon: Icons.play_arrow_rounded,
+            label: 'Play',
+            isBusy: isAudioLoading && _isSelected,
+            onTap: onTap,
+          );
+        }
+
+        return StreamBuilder<PlayerState>(
+          stream: audioPlayer.playerStateStream,
+          initialData: audioPlayer.playerState,
+          builder: (context, stateSnapshot) {
+            final state = stateSnapshot.data ?? audioPlayer.playerState;
+            final isPlaying = state.playing;
+            final isBusy = isAudioLoading ||
+                state.processingState == ProcessingState.loading ||
+                state.processingState == ProcessingState.buffering;
+            return _VerseActionChip(
+              icon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              label: isBusy
+                  ? 'Loading'
+                  : isPlaying
+                      ? 'Pause'
+                      : 'Play',
+              selected: isPlaying,
+              isBusy: isBusy,
+              onTap: isBusy ? null : onTap,
+            );
+          },
         );
       },
     );
@@ -1781,16 +2084,20 @@ class _VerseActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null && !isBusy;
     return PressableScale(
-      onTap: isBusy ? null : onTap,
+      enabled: enabled,
+      onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(100),
       child: Container(
         constraints: const BoxConstraints(minHeight: 38),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? kRoyalPurple.withValues(alpha: 0.94)
-              : kCard2.withValues(alpha: 0.74),
+          color: !enabled
+              ? kCard2.withValues(alpha: 0.34)
+              : selected
+                  ? kRoyalPurple.withValues(alpha: 0.94)
+                  : kCard2.withValues(alpha: 0.74),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
             color: selected
@@ -1813,18 +2120,26 @@ class _VerseActionChip extends StatelessWidget {
             else
               Icon(
                 icon,
-                color: selected ? kSoftGold : kText,
+                color: !enabled
+                    ? kMuted.withValues(alpha: 0.72)
+                    : selected
+                        ? kSoftGold
+                        : kText,
                 size: 16,
               ),
             const SizedBox(width: 6),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 92),
+              constraints: const BoxConstraints(maxWidth: 130),
               child: Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: gitaBody(
-                  color: selected ? kSoftGold : kText,
+                  color: !enabled
+                      ? kMuted.withValues(alpha: 0.72)
+                      : selected
+                          ? kSoftGold
+                          : kText,
                   size: 11,
                   weight: FontWeight.w900,
                 ),

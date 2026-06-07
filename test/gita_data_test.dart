@@ -43,6 +43,44 @@ void main() {
     }
   });
 
+  test('validates all 700 verse identities and local scripture fields',
+      () async {
+    final bundle = await GitaRepository.load();
+    final seen = <String>{};
+    const blockedUiTerms = [
+      'ai translation',
+      'generated',
+      'lorem ipsum',
+      'placeholder',
+      'sanskrit unavailable',
+      'transliteration unavailable',
+      'english translation unavailable',
+    ];
+
+    expect(bundle.verses, hasLength(700));
+    for (final verse in bundle.verses) {
+      expect(verse.chapterNumber, inInclusiveRange(1, 18));
+      expect(verse.verseNumber, greaterThan(0));
+      expect(seen.add('${verse.chapterNumber}.${verse.verseNumber}'), isTrue);
+
+      expect(verse.sanskrit.trim(), isNotEmpty);
+      expect(verse.transliteration.trim(), isNotEmpty);
+      expect(verse.englishTranslation.trim(), isNotEmpty);
+
+      final visibleContent = [
+        verse.sanskrit,
+        verse.transliteration,
+        verse.englishTranslation,
+        verse.cleanMeaning,
+        verse.reflectionText,
+        verse.practiceToday,
+      ].join('\n').toLowerCase();
+      for (final term in blockedUiTerms) {
+        expect(visibleContent, isNot(contains(term)));
+      }
+    }
+  });
+
   test('GitaVerse supports translation and commentary aliases', () {
     final verse = GitaVerse.fromJson({
       'id': '1.1',
@@ -60,6 +98,32 @@ void main() {
     expect(verse.meaning, 'commentary text');
     expect(verse.commentary, 'commentary text');
     expect(verse.audioAssetPath, isEmpty);
+  });
+
+  test('missing optional scripture fields stay empty for graceful UI hiding',
+      () {
+    final verse = GitaVerse.fromJson({
+      'id': '1.1',
+      'chapterNumber': 1,
+      'verseNumber': 1,
+    });
+
+    expect(verse.sanskrit, isEmpty);
+    expect(verse.transliteration, isEmpty);
+    expect(verse.englishTranslation, isEmpty);
+    expect(verse.meaning, isEmpty);
+  });
+
+  test('translation is not reused as meaning when commentary is absent', () {
+    final verse = GitaVerse.fromJson({
+      'id': '1.1',
+      'chapterNumber': 1,
+      'verseNumber': 1,
+      'translation': 'translation only',
+    });
+
+    expect(verse.englishTranslation, 'translation only');
+    expect(verse.meaning, isEmpty);
   });
 
   test('GitaChapter model alias is available', () async {
@@ -81,7 +145,7 @@ void main() {
     expect(grouped[1]?.first.id, '1.1');
   });
 
-  test('loads generated chapter JSON assets', () async {
+  test('loads chapter JSON assets', () async {
     final typedChapter = await GitaDataService.loadChapter(1);
     final rawChapter = await loadChapter(1);
 

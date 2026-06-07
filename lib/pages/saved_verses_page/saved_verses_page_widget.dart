@@ -65,8 +65,8 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
         padding: const EdgeInsets.only(bottom: 42),
         children: [
           const PageHeader(
-            title: 'Saved',
-            subtitle: 'Verses you want to return to',
+            title: 'Saved & Highlights',
+            subtitle: 'Private verses and reflections to return to',
             showBack: true,
             trailing: Icon(Icons.bookmark_rounded, color: kGold),
           ),
@@ -268,7 +268,7 @@ class _SavedVersesList extends StatelessWidget {
         if (highlighted.isNotEmpty) ...[
           const _SavedSectionHeader(
             icon: Icons.auto_awesome_rounded,
-            title: 'Highlights',
+            title: 'My Highlights',
           ),
           const SizedBox(height: 12),
           for (var i = 0; i < highlighted.length; i++) ...[

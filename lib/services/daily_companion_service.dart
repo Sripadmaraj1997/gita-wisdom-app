@@ -4,8 +4,8 @@
 // Minute Wisdom. Keeping this data in one service avoids duplicating reflection
 // copy across screens and makes future editorial expansion straightforward.
 //
-// TODO(content): Move this editorial list to a versioned local JSON file if the
-// guidance library grows beyond a small hand-curated set.
+// TODO(stronger-content-review): Move this editorial list to a reviewed,
+// versioned local JSON file if it grows beyond a small hand-curated set.
 class DailyGuidance {
   const DailyGuidance({
     required this.verseId,
@@ -37,8 +37,8 @@ class DailyCompanionService {
       reflection:
           'Peace grows when you give sincere effort without trying to control every result.',
       practiceToday:
-          'Take one meaningful action today without checking for outcome.',
-      journalPrompt: 'What outcome are you attached to today?',
+          'Take one sincere action today without worrying about the result.',
+      journalPrompt: 'What attachment can you soften today?',
       topic: 'attachment',
     ),
     DailyGuidance(
@@ -47,8 +47,8 @@ class DailyCompanionService {
       reference: 'Bhagavad Gita 2.14',
       reflection:
           'Difficult feelings rise and pass. You do not have to become every feeling that visits you.',
-      practiceToday: 'Pause before reacting and let one feeling move through.',
-      journalPrompt: 'What feeling can you allow without becoming it?',
+      practiceToday: 'Pause before reacting. Let one feeling move through.',
+      journalPrompt: 'What disturbed your peace today?',
       topic: 'peace',
     ),
     DailyGuidance(
@@ -57,8 +57,8 @@ class DailyCompanionService {
       reference: 'Bhagavad Gita 3.8',
       reflection:
           'A simple duty done with care can become a quiet path back to peace.',
-      practiceToday: 'Give one responsibility fifteen minutes of full effort.',
-      journalPrompt: 'What duty can you do with love today?',
+      practiceToday: 'Give one responsibility your full attention for a while.',
+      journalPrompt: 'Where can you act with more steadiness?',
       topic: 'discipline',
     ),
     DailyGuidance(
@@ -67,8 +67,8 @@ class DailyCompanionService {
       reference: 'Bhagavad Gita 6.5',
       reflection:
           'Your mind can become a friend when you guide it with patience instead of force.',
-      practiceToday: 'Speak to yourself once today with patience and courage.',
-      journalPrompt: 'Where can you become your own ally today?',
+      practiceToday: 'Speak to yourself once today with patience.',
+      journalPrompt: 'What gave you clarity today?',
       topic: 'clarity',
     ),
     DailyGuidance(
@@ -78,7 +78,7 @@ class DailyCompanionService {
       reflection:
           'Devotion becomes real in small moments of kindness, patience, and care.',
       practiceToday: 'Offer one quiet act of kindness without needing credit.',
-      journalPrompt: 'How can devotion become visible in your actions?',
+      journalPrompt: 'Where can you bring more gentleness today?',
       topic: 'devotion',
     ),
   ];

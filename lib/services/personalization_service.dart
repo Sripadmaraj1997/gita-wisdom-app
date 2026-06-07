@@ -1,3 +1,8 @@
+// Local personalization preferences.
+//
+// Stores a small offline profile for older personalized-plan flows: what the
+// user is seeking, language preference, and reminder time. Current Journeys do
+// not require this setup; this service remains useful for future tailoring.
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/gita_data.dart';

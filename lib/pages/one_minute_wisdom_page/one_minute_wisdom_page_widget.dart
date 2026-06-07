@@ -59,7 +59,7 @@ class OneMinuteWisdomPageWidget extends StatelessWidget {
                   icon: Icons.self_improvement_rounded,
                   title: 'Breathe',
                   body:
-                      'Pause. Take one slow breath. Let your shoulders soften before reading.',
+                      'Pause.\nTake one slow breath.\nRead this with calm attention.',
                   accent: true,
                 ),
                 const SizedBox(height: 16),

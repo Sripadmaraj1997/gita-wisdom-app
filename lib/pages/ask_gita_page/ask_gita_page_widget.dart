@@ -4,13 +4,13 @@
 // reflections, then formats calm guidance. It intentionally does not call
 // OpenAI, Firebase, or any backend so it remains fast and available offline.
 //
-// TODO(ai-guidance): A future AI layer can reuse _AskGuidance as the response
-// contract, with retrieved verses/reflections as context and local retrieval as
-// the fallback when no network or API key is available.
+// A future backend guidance layer should reuse the six-part response contract,
+// with retrieved verses/reflections as context and local retrieval as fallback.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/gita_data.dart';
+import '../../services/ask_gita_lite_service.dart';
 import '../../services/local_storage_service.dart';
 import '../gita_common/gita_common.dart';
 
@@ -35,14 +35,14 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
   final _questionController = TextEditingController();
   final _scrollController = ScrollController();
 
-  _AskGuidance? _guidance;
+  AskGitaLiteAnswer? _guidance;
   String? _emptyMessage;
   bool _isLoading = false;
 
   static const _suggestedQuestions = [
     'How do I stop worrying?',
     'How do I handle anger?',
-    'How do I stay disciplined?',
+    'I feel overwhelmed at work.',
     'How do I let go of attachment?',
     'How do I find peace?',
   ];
@@ -82,43 +82,22 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
     });
 
     try {
-      // Answer flow:
-      // 1. expand emotional wording into Gita search terms
-      // 2. retrieve the best local verse and private journal match
-      // 3. format a short five-part answer instead of a chat transcript
-      final enhancedQuestion = _expandEmotionalQuery(question);
-      final verseMatches =
-          await GitaRepository.search(enhancedQuestion, limit: 3);
-      final reflectionMatches = await _topLocalReflectionMatches(question);
-      final verse = verseMatches.isEmpty ? null : verseMatches.first.verse;
-      final reflection =
-          reflectionMatches.isEmpty ? null : reflectionMatches.first;
+      // Answer flow stays local and deterministic: map the concern to a
+      // hand-curated topic profile, retrieve a local verse, and render the
+      // six-part guidance structure.
+      final guidance = await AskGitaLiteService.answer(question);
 
       if (!mounted) {
         return;
       }
 
-      if (verse == null && reflection == null) {
-        setState(() {
-          _emptyMessage =
-              'Try asking about peace, duty, fear, anger, attachment, or purpose.';
-          _isLoading = false;
-        });
-        _scrollGentlyToAnswer();
-        return;
-      }
-
       setState(() {
-        _guidance = _AskGuidance.fromRetrieval(
-          question: question,
-          verse: verse,
-          reflection: reflection,
-        );
+        _guidance = guidance;
         _isLoading = false;
       });
       await LocalStorageService.recordAskGitaHistory(
         question: question,
-        answer: _guidance?.gentleGuidance ?? '',
+        answer: guidance.gentleGuidance,
       );
       _scrollGentlyToAnswer();
     } catch (error, stackTrace) {
@@ -133,26 +112,6 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
         _isLoading = false;
       });
       _scrollGentlyToAnswer();
-    }
-  }
-
-  Future<List<_LocalReflectionMatch>> _topLocalReflectionMatches(
-    String question,
-  ) async {
-    try {
-      // Local journal entries are treated as private context only on device.
-      // They are never uploaded or sent to a service in the MVP.
-      final entries = await LocalStorageService.journalEntries();
-      final matches = entries
-          .map((entry) => _LocalReflectionMatch.fromEntry(entry, question))
-          .where((match) => match.score > 0)
-          .toList()
-        ..sort((a, b) => b.score.compareTo(a.score));
-      return matches.take(3).toList(growable: false);
-    } catch (error, stackTrace) {
-      debugPrint('AskGita Lite local reflection search failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      return const [];
     }
   }
 
@@ -185,11 +144,21 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
           children: [
             Expanded(
               child: ListView(
+                // Answer content scrolls independently from the composer so
+                // the keyboard can appear without hiding the question field.
                 controller: _scrollController,
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  22,
+                  24,
+                  gitaFixedControlsScrollPadding(
+                    context,
+                    controlsHeight: 86,
+                  ),
+                ),
                 children: [
                   _AskHeader(onBack: () {
                     if (context.canPop()) {
@@ -199,6 +168,9 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
                     }
                   }),
                   const SizedBox(height: 22),
+                  // Question matching entry points:
+                  // These examples seed common emotional concerns while still
+                  // using the same local AskGitaLiteService as typed questions.
                   _SuggestedQuestionGrid(
                     questions: _suggestedQuestions,
                     isDisabled: _isLoading,
@@ -211,14 +183,22 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
                   if (_isLoading)
                     const _ReflectionLoadingCard()
                   else if (_guidance != null)
+                    // Answer structure:
+                    // AskGitaLiteService always returns the six-part response
+                    // contract so the UI never has to assemble generic copy.
                     _GuidanceResultCard(guidance: _guidance!)
                   else if (_emptyMessage != null)
+                    // Fallback behavior:
+                    // Retrieval failures stay calm and practical. The screen
+                    // does not expose stack traces or empty answer states.
                     _EmptyAskState(message: _emptyMessage!)
                   else
                     const _QuietStartCard(),
                 ],
               ),
             ),
+            // The composer is fixed at the bottom of the screen. Scroll
+            // padding above reserves space for it on small phones.
             _QuestionComposer(
               controller: _questionController,
               isLoading: _isLoading,
@@ -439,6 +419,9 @@ class _QuestionComposer extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
+      minimum: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 8 : 0,
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
         child: Container(
@@ -608,7 +591,7 @@ class _EmptyAskState extends StatelessWidget {
 class _GuidanceResultCard extends StatelessWidget {
   const _GuidanceResultCard({required this.guidance});
 
-  final _AskGuidance guidance;
+  final AskGitaLiteAnswer guidance;
 
   @override
   Widget build(BuildContext context) {
@@ -641,19 +624,27 @@ class _GuidanceResultCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            if (guidance.verse != null) ...[
-              _GuidanceSection(
-                icon: Icons.menu_book_rounded,
-                title: 'Relevant Gita Verse',
-                child: _RelevantVersePanel(verse: guidance.verse!),
-              ),
-              const SizedBox(height: 20),
-            ],
+            _GuidanceSection(
+              icon: Icons.menu_book_rounded,
+              title: 'Relevant Verse',
+              child: _RelevantVersePanel(verse: guidance.verse),
+            ),
+            const SizedBox(height: 20),
             _GuidanceSection(
               icon: Icons.lightbulb_outline_rounded,
               title: 'Meaning',
               child: Text(
                 guidance.meaning,
+                style:
+                    gitaBody(color: kDarkText, size: 15).copyWith(height: 1.6),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _GuidanceSection(
+              icon: Icons.favorite_border_rounded,
+              title: 'Reflection',
+              child: Text(
+                guidance.reflection,
                 style:
                     gitaBody(color: kDarkText, size: 15).copyWith(height: 1.6),
               ),
@@ -755,32 +746,15 @@ class _RelevantVersePanel extends StatelessWidget {
         children: [
           AccentPill(verse.shortReference),
           const SizedBox(height: 14),
-          if (_hasUsefulText(verse.sanskrit)) ...[
+          if (_hasUsefulText(verse.englishTranslation))
             Text(
-              verse.sanskrit,
-              style: gitaSanskrit(22).copyWith(color: kRoyalPurple),
-            ),
-            const SizedBox(height: 10),
-          ],
-          if (_hasUsefulText(verse.transliteration)) ...[
-            Text(
-              verse.transliteration,
+              verse.englishTranslation,
               style: gitaBody(
-                color: kRoyalPurple,
-                size: 14,
-                weight: FontWeight.w700,
-              ).copyWith(fontStyle: FontStyle.italic, height: 1.45),
+                color: kDarkText,
+                size: 16,
+                weight: FontWeight.w800,
+              ).copyWith(height: 1.58),
             ),
-            const SizedBox(height: 12),
-          ],
-          Text(
-            verse.englishTranslation,
-            style: gitaBody(
-              color: kDarkText,
-              size: 16,
-              weight: FontWeight.w800,
-            ).copyWith(height: 1.58),
-          ),
         ],
       ),
     );
@@ -790,7 +764,7 @@ class _RelevantVersePanel extends StatelessWidget {
 class _SourcePanel extends StatelessWidget {
   const _SourcePanel({required this.guidance});
 
-  final _AskGuidance guidance;
+  final AskGitaLiteAnswer guidance;
 
   @override
   Widget build(BuildContext context) {
@@ -816,201 +790,14 @@ class _SourcePanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          if (guidance.verse != null)
-            Text(
-              'Based on Bhagavad Gita Chapter ${guidance.verse!.chapterNumber}, Verse ${guidance.verse!.verseNumber}',
-              style: gitaBody(color: kDarkText, size: 13),
-            ),
-          if (guidance.verse?.reflectionText.trim().isNotEmpty ?? false) ...[
-            const SizedBox(height: 10),
-            const AccentPill('Verse reflection'),
-            const SizedBox(height: 8),
-            Text(
-              guidance.verse!.reflectionText,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: gitaBody(color: kDarkText, size: 13).copyWith(height: 1.5),
-            ),
-          ],
-          if (guidance.reflection != null) ...[
-            const SizedBox(height: 10),
-            const AccentPill('Local reflection matched'),
-            const SizedBox(height: 8),
-            Text(
-              guidance.reflection!.title,
-              style: gitaBody(color: kDarkText, weight: FontWeight.w900),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              guidance.reflection!.text,
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-              style: gitaBody(color: kDarkText, size: 13).copyWith(height: 1.5),
-            ),
-          ],
+          Text(
+            guidance.source,
+            style: gitaBody(color: kDarkText, size: 13),
+          ),
         ],
       ),
     );
   }
-}
-
-class _AskGuidance {
-  const _AskGuidance({
-    required this.gentleGuidance,
-    required this.meaning,
-    required this.practiceToday,
-    required this.verse,
-    required this.reflection,
-  });
-
-  final String gentleGuidance;
-  final String meaning;
-  final String practiceToday;
-  final GitaVerseData? verse;
-  final _LocalReflectionMatch? reflection;
-
-  factory _AskGuidance.fromRetrieval({
-    required String question,
-    required GitaVerseData? verse,
-    required _LocalReflectionMatch? reflection,
-  }) {
-    final sourceText = _firstNonEmpty([
-      reflection?.text,
-      verse?.reflectionText,
-      verse?.meaning,
-      verse?.englishTranslation,
-    ]);
-    return _AskGuidance(
-      verse: verse,
-      reflection: reflection,
-      gentleGuidance: _gentleGuidanceFor(question),
-      meaning: _plainMeaningFor(sourceText),
-      practiceToday: _firstNonEmpty([
-            verse?.practiceToday,
-            _practiceFor(question),
-          ]) ??
-          'Pause, reflect, and carry one insight from this verse into your day.',
-    );
-  }
-}
-
-class _LocalReflectionMatch {
-  const _LocalReflectionMatch({
-    required this.title,
-    required this.text,
-    required this.score,
-  });
-
-  final String title;
-  final String text;
-  final int score;
-
-  factory _LocalReflectionMatch.fromEntry(
-    LocalJournalEntry entry,
-    String question,
-  ) {
-    final haystack = entry.searchableText;
-    return _LocalReflectionMatch(
-      title: entry.title,
-      text: entry.text,
-      score: _scoreMatch(question, haystack),
-    );
-  }
-}
-
-String _gentleGuidanceFor(String question) {
-  final lower = question.toLowerCase();
-  if (lower.contains('worry') ||
-      lower.contains('anxious') ||
-      lower.contains('fear')) {
-    return 'The Gita invites you to return from imagined outcomes to the duty that is present now. Let your mind become steady by doing the next right action with sincerity.';
-  }
-  if (lower.contains('anger')) {
-    return 'Anger often rises when desire, fear, or expectation feels blocked. Pause before acting, soften the breath, and choose a response that protects your clarity.';
-  }
-  if (lower.contains('purpose') || lower.contains('dharma')) {
-    return 'Purpose becomes clearer through honest action, not endless pressure to know everything at once. Begin with the responsibility nearest to you and offer it with care.';
-  }
-  if (lower.contains('discipline') || lower.contains('focus')) {
-    return 'Discipline grows through repeated small actions done with steadiness. Do not wait for perfect motivation; begin gently and return again tomorrow.';
-  }
-  if (lower.contains('result') ||
-      lower.contains('attachment') ||
-      lower.contains('let go')) {
-    return 'The Gita teaches that you can give your full effort without surrendering your peace to the outcome. Your part is sincere action; the result is not fully yours to control.';
-  }
-  return 'The Gita points you toward steadiness, sincere action, and inner clarity. Meet this moment with honesty, do what is yours to do, and loosen your grip on what you cannot control.';
-}
-
-String _expandEmotionalQuery(String question) {
-  final lower = question.toLowerCase();
-  final additions = <String>[];
-  void add(List<String> words) => additions.addAll(words);
-
-  if (lower.contains('worry') ||
-      lower.contains('anxious') ||
-      lower.contains('anxiety') ||
-      lower.contains('stress')) {
-    add(['peace', 'fear', 'mind', 'steady', 'calm']);
-  }
-  if (lower.contains('anger')) {
-    add(['anger', 'desire', 'control', 'mind']);
-  }
-  if (lower.contains('discipline') || lower.contains('focus')) {
-    add(['practice', 'mind', 'yoga', 'action']);
-  }
-  if (lower.contains('attachment') ||
-      lower.contains('result') ||
-      lower.contains('let go')) {
-    add(['karma', 'action', 'fruit', 'attachment']);
-  }
-  if (lower.contains('purpose') || lower.contains('dharma')) {
-    add(['dharma', 'duty', 'action', 'purpose']);
-  }
-  if (lower.contains('peace')) {
-    add(['peace', 'devotion', 'steady', 'mind']);
-  }
-  return [question, ...additions].join(' ');
-}
-
-String _plainMeaningFor(String? sourceText) {
-  final source = sourceText?.trim();
-  if (source == null || source.isEmpty) {
-    return 'This guidance is pointing you toward calm action, self-awareness, and trust. Instead of reacting from fear or pressure, return to what can be done with clarity now.';
-  }
-  final compact = source.replaceAll(RegExp(r'\s+'), ' ');
-  if (compact.length <= 260) {
-    return compact;
-  }
-  return '${compact.substring(0, 257).trimRight()}...';
-}
-
-String _practiceFor(String question) {
-  final lower = question.toLowerCase();
-  if (lower.contains('anger')) {
-    return 'Pause before reacting. Choose clarity over impulse.';
-  }
-  if (lower.contains('discipline') || lower.contains('focus')) {
-    return 'Choose one meaningful task and give it 15 quiet minutes without distraction.';
-  }
-  if (lower.contains('purpose') || lower.contains('dharma')) {
-    return 'Offer your best effort to one clear duty, then release the outcome.';
-  }
-  if (lower.contains('result') ||
-      lower.contains('attachment') ||
-      lower.contains('let go')) {
-    return 'Notice one attachment and soften your grip on it.';
-  }
-  return 'Take one action today without worrying about the result.';
-}
-
-String? _firstNonEmpty(List<String?> values) {
-  for (final value in values) {
-    if (value != null && value.trim().isNotEmpty) {
-      return value.trim();
-    }
-  }
-  return null;
 }
 
 bool _hasUsefulText(String value) {
@@ -1018,23 +805,4 @@ bool _hasUsefulText(String value) {
   return trimmed.isNotEmpty &&
       !trimmed.contains('unavailable') &&
       !trimmed.contains('not available');
-}
-
-int _scoreMatch(String question, String haystack) {
-  // Journal matching is intentionally conservative: only direct term overlap is
-  // used, so private notes influence guidance without pretending to be semantic
-  // AI or exposing data outside the device.
-  final terms = question
-      .toLowerCase()
-      .split(RegExp(r'[^a-z0-9]+'))
-      .where((term) => term.length > 2)
-      .toSet();
-  final text = haystack.toLowerCase();
-  var score = 0;
-  for (final term in terms) {
-    if (text.contains(term)) {
-      score++;
-    }
-  }
-  return score;
 }

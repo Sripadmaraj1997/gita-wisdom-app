@@ -2,7 +2,7 @@
 //
 // The app keeps FlutterFlow's generated navigation helpers, but the MVP route
 // graph is intentionally small and explicit. Main tabs use bottom navigation;
-// detail flows such as Verse Reader, Ask Gita, Saved, Reading Plans, and One
+// detail flows such as Verse Reader, Ask Gita, Saved, Journeys, and One
 // Minute Wisdom are pushed as focused screens.
 import 'dart:async';
 

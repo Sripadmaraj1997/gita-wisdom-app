@@ -1,6 +1,6 @@
-// Settings / Profile screen for the local MVP.
+// Settings screen for the local MVP.
 //
-// Contains only working, user-facing controls: reader preferences, community
+// Contains only working, user-facing controls: reader preferences, support
 // links, about/disclaimer copy, and a local data reset. There are no account,
 // subscription, Firebase, or OpenAI settings in this offline build.
 import 'package:flutter/material.dart';
@@ -30,10 +30,10 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
       child: ListView(
         key: const PageStorageKey('settings_scroll_position'),
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 42),
+        padding: EdgeInsets.only(bottom: gitaBottomNavScrollPadding(context)),
         children: [
           const PageHeader(
-            title: 'Profile',
+            title: 'Settings',
             subtitle: 'Offline app settings and saved reflections',
           ),
           Padding(
@@ -74,6 +74,9 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                   ),
                 ),
                 const SizedBox(height: 30),
+                // Reading preferences:
+                // These settings feed VerseReaderScreen and are kept local so
+                // reading remains available without an account.
                 const _SettingsSectionHeader(
                   title: 'Reading',
                   icon: Icons.format_size_rounded,
@@ -85,8 +88,8 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                 ),
                 const SizedBox(height: 12),
                 const _SettingsSectionHeader(
-                  title: 'Community',
-                  icon: Icons.groups_rounded,
+                  title: 'Support',
+                  icon: Icons.help_outline_rounded,
                 ),
                 const SizedBox(height: 10),
                 AnimatedEntrance(
@@ -112,7 +115,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                   delay: const Duration(milliseconds: 122),
                   child: _SettingRow(
                     icon: Icons.public_rounded,
-                    label: 'Project Community',
+                    label: 'Project Source',
                     value: 'GitHub',
                     valueColor: kSoftGold,
                     iconColor: kSoftGold,
@@ -124,6 +127,9 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                // About / disclaimer:
+                // Keep source notes and spiritual-scope language close to app
+                // settings where users naturally look for trust information.
                 const _SettingsSectionHeader(
                   title: 'About',
                   icon: Icons.verified_user_rounded,
@@ -139,6 +145,9 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                   child: _DisclaimerCard(),
                 ),
                 const SizedBox(height: 18),
+                // Local data clearing:
+                // Removes user-owned saved content and preferences from this
+                // device. Bundled scripture JSON remains part of the app.
                 const _SettingsSectionHeader(
                   title: 'Data',
                   icon: Icons.storage_rounded,
@@ -172,7 +181,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
         backgroundColor: kCard,
         title: Text('Clear saved data?', style: gitaTitle(22)),
         content: Text(
-          'This removes saved verses, highlights, journal entries, reading-plan progress, Ask Gita history, font size, theme setting, and continue reading progress from this device.',
+          'This removes saved verses, highlights, journal entries, journey progress, Ask Gita history, font size, theme setting, and continue reading progress from this device.',
           style: gitaBody(color: kText),
         ),
         actions: [
@@ -269,7 +278,7 @@ class _AboutCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Gita Wisdom is a peaceful Bhagavad Gita companion created to help bring timeless wisdom into daily life.\n\nMost core features are available offline, including reading, saved verses, journal, and reflections.',
+                  'Gita Wisdom is a peaceful Bhagavad Gita companion created to help bring timeless wisdom into daily life.\n\nMost core features are available offline, including reading, saved verses, journal, and reflections.\n\nTranslations and transliterations are loaded from the app\'s local Bhagavad Gita dataset. Reflections are practical study notes intended for daily contemplation.',
                   style: gitaBody(color: kText, size: 13),
                 ),
               ],

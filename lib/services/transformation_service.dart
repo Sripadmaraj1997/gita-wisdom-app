@@ -1,3 +1,8 @@
+// Legacy transformation snapshot service.
+//
+// Combines old personalization and habit services into progress milestones.
+// The visible transformation surface is now the local Journeys screen, but this
+// service is retained for compatibility and possible future onboarding work.
 import 'habit_service.dart';
 import 'personalized_plan_service.dart';
 import 'personalization_service.dart';

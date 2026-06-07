@@ -156,13 +156,13 @@ class AppTextStyles {
   }
 
   static TextStyle body({
-    double size = 14,
+    double size = 16,
     Color color = AppColors.muted,
     FontWeight weight = FontWeight.w500,
   }) {
     return GoogleFonts.inter(
       color: color,
-      fontSize: size,
+      fontSize: size < 16 ? 16 : size,
       fontWeight: weight,
       height: 1.55,
     );
@@ -326,6 +326,9 @@ class SpiritualBackground extends StatelessWidget {
               debugPrint('SpiritualBackground image failed to load: $error');
               return const SizedBox.expand();
             },
+          ),
+          const IgnorePointer(
+            child: ColoredBox(color: Color(0xCC071E3D)),
           ),
           IgnorePointer(
             child: DecoratedBox(

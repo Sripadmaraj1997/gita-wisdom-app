@@ -1,3 +1,8 @@
+// Compatibility facade for the local Gita data layer.
+//
+// Older FlutterFlow-generated pages imported GitaService directly. Newer code
+// usually calls GitaDataService or GitaRepository, but this wrapper keeps legacy
+// imports stable while still serving the same local JSON-backed scripture data.
 import '../data/gita_data.dart';
 
 export '../data/gita_data.dart'

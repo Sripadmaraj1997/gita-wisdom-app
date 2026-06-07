@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/gita_data.dart';
 import '../../services/daily_companion_service.dart';
+import '../../services/journey_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/reading_progress_service.dart';
 import '../gita_common/gita_common.dart';
@@ -24,19 +25,24 @@ class HomePageWidget extends StatelessWidget {
       child: ListView(
         key: const PageStorageKey('home_scroll_position'),
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 42),
+        padding: EdgeInsets.only(bottom: gitaBottomNavScrollPadding(context)),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 28, 24, 34),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // The hero is emotional arrival only. Primary actions stay
-                // below it so the screen feels guided rather than promotional.
+                // Greeting / companion flow:
+                // The hero creates a gentle arrival moment. Primary actions
+                // stay below it so Home feels like a daily companion instead
+                // of a marketing page or dense dashboard.
                 const AnimatedEntrance(
                   child: _KrishnaHeroSection(),
                 ),
                 const SizedBox(height: 24),
+                // Continue Reading:
+                // Restores the last verse saved by VerseReaderScreen so a
+                // returning user can resume scripture reading immediately.
                 _SectionHeader(
                   title: 'Continue reading',
                   action: 'All chapters',
@@ -74,7 +80,36 @@ class HomePageWidget extends StatelessWidget {
                     );
                   },
                 ),
+                const SizedBox(height: 24),
+                // Journeys:
+                // Surfaces the active local journey on Home as the main habit
+                // feature. Progress stays private on this device.
+                FutureBuilder<GitaCurrentJourney>(
+                  future: JourneyService.currentJourney(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const LoadingStateCard(
+                        message: 'Preparing your journey...',
+                      );
+                    }
+                    final journey = snapshot.data;
+                    if (journey == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return AnimatedEntrance(
+                      delay: const Duration(milliseconds: 58),
+                      child: _HomeCurrentJourneyCard(
+                        current: journey,
+                        onContinue: () => context.push('/transformationPage'),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 28),
+                // Read Gita / Ask Gita:
+                // The two primary paths cover direct scripture reading and
+                // retrieval-based guidance without sending user questions to an
+                // external AI/API service.
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 65),
                   child: _PrimaryActionCards(
@@ -82,7 +117,15 @@ class HomePageWidget extends StatelessWidget {
                     onAsk: () => context.push('/askGitaPage'),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
+                const AnimatedEntrance(
+                  delay: Duration(milliseconds: 74),
+                  child: _PauseBeforeReadingCard(),
+                ),
+                const SizedBox(height: 18),
+                // Today's Guidance:
+                // A deterministic local rotation gives a daily reflection,
+                // related verse, journal prompt, and short practice.
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 80),
                   child: _TodaysGuidanceCard(
@@ -133,6 +176,9 @@ class HomePageWidget extends StatelessWidget {
                     );
                   },
                 ),
+                // Recently Reflected On:
+                // Shows recent private study activity so the next tap can
+                // continue a thread of contemplation rather than start over.
                 _RecentlyReflectedSection(
                   onOpenVerse: (verseId) => context.push(Uri(
                     path: '/verseReaderPage',
@@ -144,9 +190,13 @@ class HomePageWidget extends StatelessWidget {
                   ).toString()),
                 ),
                 const SizedBox(height: 28),
+                // Secondary actions:
+                // Keeps useful Bible-app-level tools accessible while avoiding
+                // social feeds, profiles, comments, or other noisy surfaces.
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 150),
                   child: _SecondaryActionCards(
+                    onPlans: () => context.push('/transformationPage'),
                     onSearch: () => context.go('/searchPage'),
                     onJournal: () => context.go('/journalPage'),
                     onSaved: () => context.push('/savedVersesPage'),
@@ -163,6 +213,14 @@ class HomePageWidget extends StatelessWidget {
 
 class _KrishnaHeroSection extends StatelessWidget {
   const _KrishnaHeroSection();
+
+  String _timeAwareGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 17) {
+      return 'Reflect gently on what brought peace today.';
+    }
+    return 'May today bring clarity and steadiness.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +315,7 @@ class _KrishnaHeroSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'May today bring clarity and peace.',
+                _timeAwareGreeting(),
                 style: gitaBody(
                   color: kText,
                   size: 17,
@@ -265,6 +323,37 @@ class _KrishnaHeroSection extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PauseBeforeReadingCard extends StatelessWidget {
+  const _PauseBeforeReadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return PremiumCard(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const IconMedallion(
+            icon: Icons.self_improvement_rounded,
+            size: 42,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              'Pause.\nTake one slow breath.\nRead this with calm attention.',
+              style: gitaBody(
+                color: kText,
+                size: 15,
+                weight: FontWeight.w800,
+              ).copyWith(height: 1.55),
+            ),
           ),
         ],
       ),
@@ -494,27 +583,31 @@ class _TodaysGuidanceCardState extends State<_TodaysGuidanceCard> {
               children: [
                 const Icon(Icons.wb_sunny_rounded, color: kGold, size: 20),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Today\'s Guidance',
-                    style: gitaBody(
-                      color: kRoyalPurple,
-                      size: 13,
-                      weight: FontWeight.w900,
-                    ),
+                const Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _GoldHighlightLabel('Today\'s Guidance'),
                   ),
                 ),
-                FutureBuilder<int>(
-                  future: _streakFuture,
-                  builder: (context, snapshot) {
-                    final streak = snapshot.data ?? 0;
-                    if (streak <= 0) {
-                      return const SizedBox.shrink();
-                    }
-                    return AccentPill(
-                      '$streak day${streak == 1 ? '' : 's'} of reflection',
-                    );
-                  },
+                Flexible(
+                  child: FutureBuilder<int>(
+                    future: _streakFuture,
+                    builder: (context, snapshot) {
+                      final streak = snapshot.data ?? 0;
+                      if (streak <= 0) {
+                        return const Align(
+                          alignment: Alignment.centerRight,
+                          child: AccentPill('Begin again gently'),
+                        );
+                      }
+                      return Align(
+                        alignment: Alignment.centerRight,
+                        child: AccentPill(
+                          '$streak Day${streak == 1 ? '' : 's'} of Reflection',
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -566,6 +659,14 @@ class _TodaysGuidanceCardState extends State<_TodaysGuidanceCard> {
               ),
             ),
             const SizedBox(height: 16),
+            Text(
+              'One sincere step is enough today.',
+              style: gitaTransliteration(
+                size: 14,
+                color: kRoyalPurple.withValues(alpha: 0.82),
+              ),
+            ),
+            const SizedBox(height: 16),
             Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -614,14 +715,7 @@ class _PracticeTodayBox extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Practice Today',
-                  style: gitaBody(
-                    color: kRoyalPurple,
-                    size: 12,
-                    weight: FontWeight.w900,
-                  ),
-                ),
+                const _GoldHighlightLabel('Practice Today'),
                 const SizedBox(height: 5),
                 Text(
                   text,
@@ -635,6 +729,40 @@ class _PracticeTodayBox extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GoldHighlightLabel extends StatelessWidget {
+  const _GoldHighlightLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: kGold,
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: [
+          BoxShadow(
+            color: kGold.withValues(alpha: 0.22),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: gitaBody(
+          color: kDarkText,
+          size: 12,
+          weight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -668,13 +796,7 @@ class _CompactDailyVerseCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Daily Verse',
-                      style: gitaBody(
-                        color: kAntiqueGold,
-                        weight: FontWeight.w900,
-                      ),
-                    ),
+                    const _GoldHighlightLabel('Today\'s Verse'),
                     const SizedBox(height: 3),
                     Text(
                       verse.reference,
@@ -750,12 +872,17 @@ class _ReflectionAction extends StatelessWidget {
           children: [
             Icon(icon, color: kSoftGold, size: 16),
             const SizedBox(width: 7),
-            Text(
-              label,
-              style: gitaBody(
-                color: kText,
-                size: 12,
-                weight: FontWeight.w900,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 112),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: gitaBody(
+                  color: kText,
+                  size: 12,
+                  weight: FontWeight.w900,
+                ),
               ),
             ),
           ],
@@ -1054,6 +1181,101 @@ class _ReflectedChip extends StatelessWidget {
   }
 }
 
+class _HomeCurrentJourneyCard extends StatelessWidget {
+  const _HomeCurrentJourneyCard({
+    required this.current,
+    required this.onContinue,
+  });
+
+  final GitaCurrentJourney current;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final journey = current.journey;
+    final progress = current.completedCount / journey.totalDays;
+    return PremiumCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AccentPill('Current Journey'),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const IconMedallion(icon: Icons.route_rounded, size: 46),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      journey.title,
+                      style: gitaBody(
+                        color: kText,
+                        size: 17,
+                        weight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Day ${current.nextDay} of ${journey.totalDays}',
+                      style: gitaBody(
+                        color: kAntiqueGold,
+                        weight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      journey.subtitle,
+                      style: gitaBody(color: kMuted, size: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: kLine,
+              valueColor: const AlwaysStoppedAnimation<Color>(kGold),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${current.completedCount} Days of Reflection',
+                  style: gitaBody(
+                    color: kMuted,
+                    size: 13,
+                    weight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onContinue,
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: const Text('Continue Journey'),
+                style: TextButton.styleFrom(
+                  foregroundColor: kGold,
+                  textStyle: gitaBody(size: 13, weight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PrimaryActionCards extends StatelessWidget {
   const _PrimaryActionCards({
     required this.onRead,
@@ -1087,11 +1309,13 @@ class _PrimaryActionCards extends StatelessWidget {
 
 class _SecondaryActionCards extends StatelessWidget {
   const _SecondaryActionCards({
+    required this.onPlans,
     required this.onSearch,
     required this.onJournal,
     required this.onSaved,
   });
 
+  final VoidCallback onPlans;
   final VoidCallback onSearch;
   final VoidCallback onJournal;
   final VoidCallback onSaved;
@@ -1099,14 +1323,15 @@ class _SecondaryActionCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
+      ('Journeys', Icons.route_rounded, onPlans),
       ('Journal', Icons.edit_note_rounded, onJournal),
+      ('Saved & Highlights', Icons.bookmark_rounded, onSaved),
       ('Search', Icons.travel_explore_rounded, onSearch),
-      ('Saved Verses', Icons.bookmark_rounded, onSaved),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(title: 'More tools'),
+        const _SectionHeader(title: 'Private study tools'),
         const SizedBox(height: 14),
         _ActionRow(
           actions: actions,
@@ -1334,13 +1559,30 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(title,
-            style: gitaBody(size: 19, color: kText, weight: FontWeight.w900)),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: gitaBody(size: 19, color: kText, weight: FontWeight.w900),
+          ),
+        ),
         if (action != null && onTap != null) ...[
-          const Spacer(),
+          const SizedBox(width: 12),
           TextButton(
-              onPressed: onTap,
-              child: Text(action!, style: gitaBody(color: kSoftGold))),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: onTap,
+            child: Text(
+              action!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: gitaBody(color: kSoftGold, weight: FontWeight.w900),
+            ),
+          ),
         ],
       ],
     );
