@@ -11,6 +11,7 @@ import '../../services/journey_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/reading_progress_service.dart';
 import '../gita_common/gita_common.dart';
+import '../transformation_page/transformation_page_widget.dart';
 
 class HomePageWidget extends StatelessWidget {
   const HomePageWidget({super.key});
@@ -43,10 +44,8 @@ class HomePageWidget extends StatelessWidget {
                 // Continue Reading:
                 // Restores the last verse saved by VerseReaderScreen so a
                 // returning user can resume scripture reading immediately.
-                _SectionHeader(
+                const _SectionHeader(
                   title: 'Continue reading',
-                  action: 'All chapters',
-                  onTap: () => context.go('/chaptersPage'),
                 ),
                 const SizedBox(height: 16),
                 FutureBuilder<_ContinueReadingData>(
@@ -80,31 +79,6 @@ class HomePageWidget extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 24),
-                // Journeys:
-                // Surfaces the active local journey on Home as the main habit
-                // feature. Progress stays private on this device.
-                FutureBuilder<GitaCurrentJourney>(
-                  future: JourneyService.currentJourney(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const LoadingStateCard(
-                        message: 'Preparing your journey...',
-                      );
-                    }
-                    final journey = snapshot.data;
-                    if (journey == null) {
-                      return const SizedBox.shrink();
-                    }
-                    return AnimatedEntrance(
-                      delay: const Duration(milliseconds: 58),
-                      child: _HomeCurrentJourneyCard(
-                        current: journey,
-                        onContinue: () => context.push('/transformationPage'),
-                      ),
-                    );
-                  },
-                ),
                 const SizedBox(height: 28),
                 // Read Gita / Ask Gita:
                 // The two primary paths cover direct scripture reading and
@@ -118,14 +92,9 @@ class HomePageWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                const AnimatedEntrance(
-                  delay: Duration(milliseconds: 74),
-                  child: _PauseBeforeReadingCard(),
-                ),
-                const SizedBox(height: 18),
                 // Today's Guidance:
-                // A deterministic local rotation gives a daily reflection,
-                // related verse, journal prompt, and short practice.
+                // The daily companion experience stays singular: one verse
+                // reference, one reflection, and one practice.
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 80),
                   child: _TodaysGuidanceCard(
@@ -137,48 +106,46 @@ class HomePageWidget extends StatelessWidget {
                         queryParameters: {'verseId': guidance.verseId},
                       ).toString());
                     },
-                    onJournal: (guidance) => context.push(Uri(
-                      path: '/journalPage',
-                      queryParameters: {
-                        'prefill': guidance.journalPrompt,
-                        'chapter': guidance.chapterNumber.toString(),
-                      },
-                    ).toString()),
                   ),
                 ),
-                const SizedBox(height: 28),
-                FutureBuilder<GitaVerseData>(
-                  // Daily Verse uses the local Gita dataset directly so it
-                  // remains available offline and never blocks on a backend.
-                  future: GitaRepository.dailyVerse(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const LoadingStateCard(
-                        message: 'Preparing today\'s verse...',
-                      );
-                    }
-                    final verse = snapshot.data;
-                    if (snapshot.hasError || verse == null) {
-                      debugPrint('Home daily verse failed: ${snapshot.error}');
-                      return const ErrorStateCard(
-                        message: 'Could not load today\'s verse.',
-                      );
-                    }
-                    return AnimatedEntrance(
-                      delay: const Duration(milliseconds: 96),
-                      child: _CompactDailyVerseCard(
-                        verse: verse,
-                        onTap: () => context.push(Uri(
-                          path: '/verseReaderPage',
-                          queryParameters: {'verseId': verse.id},
-                        ).toString()),
-                      ),
+                const SizedBox(height: 24),
+                // Journeys:
+                // Surfaces the active local journey after today's verse so the
+                // Home flow stays content-first: resume scripture, choose a
+                // path, receive guidance, then continue the guided journey.
+                ValueListenableBuilder<int>(
+                  valueListenable: LocalStorageService.journeyProgressRevision,
+                  builder: (context, revision, _) {
+                    return FutureBuilder<GitaCurrentJourney>(
+                      key: ValueKey('home_journey_$revision'),
+                      future: JourneyService.currentJourney(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState != ConnectionState.done) {
+                          return const LoadingStateCard(
+                            message: 'Preparing your journey...',
+                          );
+                        }
+                        final journey = snapshot.data;
+                        if (journey == null) {
+                          return const SizedBox.shrink();
+                        }
+                        return AnimatedEntrance(
+                          delay: const Duration(milliseconds: 100),
+                          child: _HomeCurrentJourneyCard(
+                            current: journey,
+                            onContinue: () {
+                              if (journey.isComplete) {
+                                _showNextJourneyPicker(context);
+                                return;
+                              }
+                              _continueJourneyFromHome(context);
+                            },
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
-                // Recently Reflected On:
-                // Shows recent private study activity so the next tap can
-                // continue a thread of contemplation rather than start over.
                 _RecentlyReflectedSection(
                   onOpenVerse: (verseId) => context.push(Uri(
                     path: '/verseReaderPage',
@@ -196,7 +163,6 @@ class HomePageWidget extends StatelessWidget {
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 150),
                   child: _SecondaryActionCards(
-                    onPlans: () => context.push('/transformationPage'),
                     onSearch: () => context.go('/searchPage'),
                     onJournal: () => context.go('/journalPage'),
                     onSaved: () => context.push('/savedVersesPage'),
@@ -225,8 +191,8 @@ class _KrishnaHeroSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 248),
-      padding: const EdgeInsets.all(22),
+      constraints: const BoxConstraints(minHeight: 136),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -234,49 +200,29 @@ class _KrishnaHeroSection extends StatelessWidget {
           colors: [
             kNavy,
             kPeacockTeal,
-            kRoyalPurple,
             kDeepBrinjal,
           ],
-          stops: [0, 0.42, 0.74, 1],
+          stops: [0, 0.58, 1],
         ),
-        borderRadius: BorderRadius.circular(34),
-        border: Border.all(color: kGold.withValues(alpha: 0.42)),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: kGold.withValues(alpha: 0.28)),
         boxShadow: [
           BoxShadow(
-            color: kGold.withValues(alpha: 0.34),
-            blurRadius: 44,
-            offset: const Offset(0, 18),
-          ),
-          BoxShadow(
-            color: kRoyalPurple.withValues(alpha: 0.20),
-            blurRadius: 52,
-            offset: const Offset(0, 24),
+            color: kGold.withValues(alpha: 0.16),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Stack(
         children: [
-          const Positioned(
-            top: 10,
-            right: 4,
-            child: _KrishnaInspiredImageArea(),
-          ),
           Positioned(
-            top: -36,
-            right: -20,
+            top: -34,
+            right: -28,
             child: Icon(
               Icons.spa_rounded,
-              size: 156,
-              color: kAntiqueGold.withValues(alpha: 0.12),
-            ),
-          ),
-          Positioned(
-            bottom: -30,
-            right: 24,
-            child: Icon(
-              Icons.music_note_rounded,
-              size: 124,
-              color: kGold.withValues(alpha: 0.17),
+              size: 132,
+              color: kAntiqueGold.withValues(alpha: 0.10),
             ),
           ),
           Column(
@@ -299,12 +245,12 @@ class _KrishnaHeroSection extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               Text(
                 'Welcome back.',
-                style: gitaTitle(33).copyWith(
+                style: gitaTitle(27).copyWith(
                   color: kAntiqueGold,
-                  height: 1.05,
+                  height: 1.1,
                   shadows: [
                     Shadow(
                       color: kCard.withValues(alpha: 0.72),
@@ -313,157 +259,16 @@ class _KrishnaHeroSection extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 _timeAwareGreeting(),
                 style: gitaBody(
                   color: kText,
-                  size: 17,
+                  size: 16,
                   weight: FontWeight.w800,
-                ),
+                ).copyWith(height: 1.4),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PauseBeforeReadingCard extends StatelessWidget {
-  const _PauseBeforeReadingCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return PremiumCard(
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const IconMedallion(
-            icon: Icons.self_improvement_rounded,
-            size: 42,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              'Pause.\nTake one slow breath.\nRead this with calm attention.',
-              style: gitaBody(
-                color: kText,
-                size: 15,
-                weight: FontWeight.w800,
-              ).copyWith(height: 1.55),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _KrishnaInspiredImageArea extends StatelessWidget {
-  const _KrishnaInspiredImageArea();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 154,
-      height: 180,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 132,
-            height: 132,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  kAntiqueGold.withValues(alpha: 0.52),
-                  kGold.withValues(alpha: 0.18),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            top: 6,
-            right: 12,
-            child: Transform.rotate(
-              angle: -0.55,
-              child: Icon(
-                Icons.spa_rounded,
-                size: 82,
-                color: kAntiqueGold.withValues(alpha: 0.72),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 31,
-            right: 42,
-            child: Container(
-              width: 21,
-              height: 21,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const RadialGradient(
-                  colors: [kGold, kSoftGold, kRoyalPurple],
-                ),
-                border: Border.all(color: kAntiqueGold.withValues(alpha: 0.72)),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 48,
-            right: 6,
-            child: Transform.rotate(
-              angle: -0.72,
-              child: Container(
-                width: 126,
-                height: 10,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [kAntiqueGold, kSoftGold, kGold],
-                  ),
-                  borderRadius: BorderRadius.circular(100),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kGold.withValues(alpha: 0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 58,
-            right: 36,
-            child: Row(
-              children: [
-                for (var i = 0; i < 4; i++) ...[
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: kDeepBrinjal.withValues(alpha: 0.62),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 10,
-            left: 20,
-            child: Icon(
-              Icons.music_note_rounded,
-              size: 58,
-              color: kGold.withValues(alpha: 0.30),
-            ),
           ),
         ],
       ),
@@ -528,12 +333,10 @@ class _TodaysGuidanceCard extends StatefulWidget {
   const _TodaysGuidanceCard({
     required this.guidance,
     required this.onReadVerse,
-    required this.onJournal,
   });
 
   final DailyGuidance guidance;
   final ValueChanged<DailyGuidance> onReadVerse;
-  final ValueChanged<DailyGuidance> onJournal;
 
   @override
   State<_TodaysGuidanceCard> createState() => _TodaysGuidanceCardState();
@@ -676,11 +479,6 @@ class _TodaysGuidanceCardState extends State<_TodaysGuidanceCard> {
                   label: 'Read Verse',
                   onTap: () => widget.onReadVerse(guidance),
                 ),
-                _ReflectionAction(
-                  icon: Icons.edit_note_rounded,
-                  label: 'Journal Prompt',
-                  onTap: () => widget.onJournal(guidance),
-                ),
               ],
             ),
           ],
@@ -768,82 +566,6 @@ class _GoldHighlightLabel extends StatelessWidget {
   }
 }
 
-class _CompactDailyVerseCard extends StatelessWidget {
-  const _CompactDailyVerseCard({
-    required this.verse,
-    required this.onTap,
-  });
-
-  final GitaVerseData verse;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PurpleVerseCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const IconMedallion(
-                icon: Icons.wb_sunny_rounded,
-                size: 44,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _GoldHighlightLabel('Today\'s Verse'),
-                    const SizedBox(height: 3),
-                    Text(
-                      verse.reference,
-                      style: gitaBody(color: kMuted, size: 12),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: kGold),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            verse.sanskrit,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: gitaSanskrit(22).copyWith(
-              color: kAntiqueGold,
-              height: 1.46,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: kCream,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: kGold.withValues(alpha: 0.20)),
-            ),
-            child: Text(
-              verse.englishTranslation,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: gitaBody(
-                color: kDarkText,
-                size: 15,
-                weight: FontWeight.w800,
-              ).copyWith(height: 1.48),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ReflectionAction extends StatelessWidget {
   const _ReflectionAction({
     required this.icon,
@@ -885,6 +607,288 @@ class _ReflectionAction extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentlyReflectedSection extends StatelessWidget {
+  const _RecentlyReflectedSection({
+    required this.onOpenVerse,
+    required this.onOpenTopic,
+  });
+
+  final ValueChanged<String> onOpenVerse;
+  final ValueChanged<String> onOpenTopic;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<LocalReflectedItem>>(
+      future: LocalStorageService.recentReflections(),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? const [];
+        if (snapshot.connectionState != ConnectionState.done || items.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return AnimatedEntrance(
+          delay: const Duration(milliseconds: 96),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(title: 'Recently Reflected On'),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final item in items.take(4))
+                      _ReflectedChip(
+                        item: item,
+                        onTap: () {
+                          if (item.isVerse && item.verseId != null) {
+                            onOpenVerse(item.verseId!);
+                            return;
+                          }
+                          if (item.isTopic && item.topic != null) {
+                            onOpenTopic(item.topic!);
+                          }
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ReflectedChip extends StatelessWidget {
+  const _ReflectedChip({
+    required this.item,
+    required this.onTap,
+  });
+
+  final LocalReflectedItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(100),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: kCard2.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: kGold.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              item.isVerse ? Icons.menu_book_rounded : Icons.spa_rounded,
+              color: kGold,
+              size: 15,
+            ),
+            const SizedBox(width: 7),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 170),
+              child: Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: gitaBody(
+                  color: kText,
+                  size: 12,
+                  weight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _continueJourneyFromHome(BuildContext context) async {
+  debugPrint('continueJourney tapped');
+  final currentJourneyId = await LocalStorageService.currentJourneyId();
+  debugPrint('currentJourneyId value: ${currentJourneyId ?? 'none'}');
+
+  var journeyId = currentJourneyId;
+  if (journeyId == null || journeyId.isEmpty) {
+    // Fresh installs use the calm default journey immediately, so Continue
+    // Journey never falls back to Home or asks the user to recover context.
+    journeyId = 'journey_peace_7';
+    debugPrint('no journey found → starting default journey $journeyId');
+    await LocalStorageService.startJourney(journeyId);
+    debugPrint('selected journey saved: $journeyId');
+  }
+
+  final day = await LocalStorageService.currentJourneyDay();
+  debugPrint('opening day number: $day');
+  if (!context.mounted) {
+    return;
+  }
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => TransformationPageWidget(initialJourneyId: journeyId),
+    ),
+  );
+}
+
+Future<void> _showNextJourneyPicker(BuildContext context) async {
+  debugPrint('StartNextJourney tapped');
+  final journeys = JourneyService.recommendedAfterCompletion();
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (sheetContext) => _HomeNextJourneySheet(
+      journeys: journeys,
+      onSelect: (journey) => _startNextJourneyFromHome(
+        parentContext: context,
+        sheetContext: sheetContext,
+        journey: journey,
+      ),
+    ),
+  );
+}
+
+Future<void> _startNextJourneyFromHome({
+  required BuildContext parentContext,
+  required BuildContext sheetContext,
+  required GitaJourneySummary journey,
+}) async {
+  debugPrint('selected journey id ${journey.id}');
+  await LocalStorageService.startJourney(journey.id);
+  debugPrint('navigation target JourneyDay ${journey.id} day 1');
+  if (!parentContext.mounted || !sheetContext.mounted) {
+    return;
+  }
+  Navigator.of(sheetContext).pop();
+  ScaffoldMessenger.of(parentContext).showSnackBar(
+    SnackBar(
+      content: Text(
+        'Journey started',
+        style: gitaBody(color: kText, weight: FontWeight.w800),
+      ),
+      backgroundColor: kRoyalPurple,
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+  Navigator.of(parentContext).push(
+    MaterialPageRoute<void>(
+      builder: (_) => TransformationPageWidget(
+        initialJourneyId: journey.id,
+      ),
+    ),
+  );
+}
+
+class _HomeNextJourneySheet extends StatelessWidget {
+  const _HomeNextJourneySheet({
+    required this.journeys,
+    required this.onSelect,
+  });
+
+  final List<GitaJourneySummary> journeys;
+  final Future<void> Function(GitaJourneySummary journey) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
+        decoration: BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: kGold.withValues(alpha: 0.24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 28,
+              offset: const Offset(0, 18),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AccentPill('Choose Your Next Journey'),
+            const SizedBox(height: 14),
+            Text(
+              'Begin gently with a path that fits this season.',
+              style: gitaBody(color: kMuted, size: 13).copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 14),
+            for (final journey in journeys) ...[
+              PressableScale(
+                onTap: () => onSelect(journey),
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  key: ValueKey('home_next_journey_${journey.id}'),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: kCream,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: kGold.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const IconMedallion(
+                        icon: Icons.route_rounded,
+                        size: 38,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              journey.title,
+                              style: gitaBody(
+                                color: kDarkText,
+                                weight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${journey.totalDays} days',
+                              style: gitaBody(
+                                color: kDarkText.withValues(alpha: 0.66),
+                                size: 12,
+                                weight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: kGold,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (journey != journeys.last) const SizedBox(height: 10),
+            ],
           ],
         ),
       ),
@@ -1078,109 +1082,6 @@ class _ContinueReadingCard extends StatelessWidget {
   }
 }
 
-class _RecentlyReflectedSection extends StatelessWidget {
-  const _RecentlyReflectedSection({
-    required this.onOpenVerse,
-    required this.onOpenTopic,
-  });
-
-  final ValueChanged<String> onOpenVerse;
-  final ValueChanged<String> onOpenTopic;
-
-  @override
-  Widget build(BuildContext context) {
-    // Recent items intentionally support both exact verses and emotional topics:
-    // verse items reopen Verse Reader; topic items reopen Search.
-    return FutureBuilder<List<LocalReflectedItem>>(
-      future: LocalStorageService.recentReflections(),
-      builder: (context, snapshot) {
-        final items = snapshot.data ?? const [];
-        if (snapshot.connectionState != ConnectionState.done || items.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return AnimatedEntrance(
-          delay: const Duration(milliseconds: 92),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 28),
-              const _SectionHeader(title: 'Recently Reflected On'),
-              const SizedBox(height: 14),
-              PremiumCard(
-                padding: const EdgeInsets.all(16),
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    for (final item in items)
-                      _ReflectedChip(
-                        item: item,
-                        onTap: () {
-                          if (item.isVerse) {
-                            onOpenVerse(item.verseId!);
-                            return;
-                          }
-                          if (item.isTopic) {
-                            onOpenTopic(item.topic!);
-                          }
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ReflectedChip extends StatelessWidget {
-  const _ReflectedChip({
-    required this.item,
-    required this.onTap,
-  });
-
-  final LocalReflectedItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(100),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-        decoration: BoxDecoration(
-          color: kCard2.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: kGold.withValues(alpha: 0.24)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              item.isVerse ? Icons.menu_book_rounded : Icons.spa_rounded,
-              color: kGold,
-              size: 16,
-            ),
-            const SizedBox(width: 7),
-            Text(
-              item.label,
-              style: gitaBody(
-                color: kText,
-                size: 12,
-                weight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _HomeCurrentJourneyCard extends StatelessWidget {
   const _HomeCurrentJourneyCard({
     required this.current,
@@ -1194,17 +1095,23 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final journey = current.journey;
     final progress = current.completedCount / journey.totalDays;
+    final isComplete = current.isComplete;
     return PremiumCard(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AccentPill('Current Journey'),
+          AccentPill(isComplete ? 'Journey Complete' : 'Current Journey'),
           const SizedBox(height: 14),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const IconMedallion(icon: Icons.route_rounded, size: 46),
+              IconMedallion(
+                icon: isComplete
+                    ? Icons.check_circle_rounded
+                    : Icons.route_rounded,
+                size: 46,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -1220,7 +1127,9 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Day ${current.nextDay} of ${journey.totalDays}',
+                      isComplete
+                          ? 'You completed ${journey.title}.'
+                          : 'Day ${current.nextDay} of ${journey.totalDays}',
                       style: gitaBody(
                         color: kAntiqueGold,
                         weight: FontWeight.w900,
@@ -1251,7 +1160,9 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${current.completedCount} Days of Reflection',
+                  isComplete
+                      ? current.progressLabel
+                      : '${current.completedCount} Days of Reflection',
                   style: gitaBody(
                     color: kMuted,
                     size: 13,
@@ -1261,8 +1172,14 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
               ),
               TextButton.icon(
                 onPressed: onContinue,
-                icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                label: const Text('Continue Journey'),
+                icon: Icon(
+                  isComplete
+                      ? Icons.verified_rounded
+                      : Icons.play_arrow_rounded,
+                  size: 18,
+                ),
+                label: Text(
+                    isComplete ? 'Choose Next Journey' : 'Continue Journey'),
                 style: TextButton.styleFrom(
                   foregroundColor: kGold,
                   textStyle: gitaBody(size: 13, weight: FontWeight.w900),
@@ -1270,6 +1187,36 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
               ),
             ],
           ),
+          if (isComplete) ...[
+            const SizedBox(height: 12),
+            Text(
+              'What insight will you carry forward?',
+              style: gitaBody(
+                color: kText,
+                size: 14,
+                weight: FontWeight.w700,
+              ).copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Recommended next journeys',
+              style: gitaBody(
+                color: kMuted,
+                size: 13,
+                weight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final journey
+                    in JourneyService.recommendedAfterCompletion())
+                  AccentPill(journey.title),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1295,12 +1242,12 @@ class _PrimaryActionCards extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionHeader(
-          title: 'Choose your path',
+          title: 'Read or Ask',
         ),
         const SizedBox(height: 14),
         _ActionRow(
           actions: actions,
-          highlightedIndexes: const {0, 1},
+          highlightedIndexes: const {},
         ),
       ],
     );
@@ -1309,13 +1256,11 @@ class _PrimaryActionCards extends StatelessWidget {
 
 class _SecondaryActionCards extends StatelessWidget {
   const _SecondaryActionCards({
-    required this.onPlans,
     required this.onSearch,
     required this.onJournal,
     required this.onSaved,
   });
 
-  final VoidCallback onPlans;
   final VoidCallback onSearch;
   final VoidCallback onJournal;
   final VoidCallback onSaved;
@@ -1323,15 +1268,14 @@ class _SecondaryActionCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      ('Journeys', Icons.route_rounded, onPlans),
-      ('Journal', Icons.edit_note_rounded, onJournal),
-      ('Saved & Highlights', Icons.bookmark_rounded, onSaved),
       ('Search', Icons.travel_explore_rounded, onSearch),
+      ('Journal', Icons.edit_note_rounded, onJournal),
+      ('Saved Wisdom', Icons.bookmark_rounded, onSaved),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(title: 'Private study tools'),
+        const _SectionHeader(title: 'Keep Reflecting'),
         const SizedBox(height: 14),
         _ActionRow(
           actions: actions,
@@ -1547,13 +1491,9 @@ class _GoldenQuickIcon extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.title,
-    this.action,
-    this.onTap,
   });
 
   final String title;
-  final String? action;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1567,23 +1507,6 @@ class _SectionHeader extends StatelessWidget {
             style: gitaBody(size: 19, color: kText, weight: FontWeight.w900),
           ),
         ),
-        if (action != null && onTap != null) ...[
-          const SizedBox(width: 12),
-          TextButton(
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: onTap,
-            child: Text(
-              action!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: gitaBody(color: kSoftGold, weight: FontWeight.w900),
-            ),
-          ),
-        ],
       ],
     );
   }

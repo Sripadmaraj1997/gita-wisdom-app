@@ -13,6 +13,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../services/content_quality_framework.dart';
+
 class GitaChapterData {
   const GitaChapterData({
     required this.id,
@@ -146,6 +148,14 @@ class GitaVerse {
   String get english => englishTranslation;
   String get commentary => meaning;
   String get cleanMeaning => cleanLocalMeaning(meaning);
+  String get gitaWisdomInterpretation {
+    final reviewed = ContentQualityFramework.interpretationForVerse(id);
+    if (reviewed != null) {
+      return reviewed;
+    }
+    return cleanMeaning;
+  }
+
   String get reflection => reflectionText;
   List<String> get allTags => {...tags, ...reflectionTags}.toList();
 
@@ -499,13 +509,27 @@ class GitaDataService {
               item.verseNumber > 0 &&
               (item.reflection.isNotEmpty || item.practiceToday.isNotEmpty))
           .toList(growable: false);
+      final reviewed = ContentQualityFramework.reviewedReflections().map(
+        (verseId, content) => MapEntry(
+          verseId,
+          GitaReflection(
+            chapterNumber: content.chapterNumber,
+            verseNumber: content.verseNumber,
+            reflection: content.reflection.text,
+            practiceToday: content.practiceToday.text,
+            tags: content.topicTags.values,
+          ),
+        ),
+      );
       if (kDebugMode) {
         debugPrint(
-          'GitaDataService: reflections loaded: ${reflections.length}',
+          'GitaDataService: reflections loaded: '
+          '${reflections.length} asset, ${reviewed.length} reviewed',
         );
       }
       return {
-        for (final reflection in reflections) reflection.verseId: reflection
+        for (final reflection in reflections) reflection.verseId: reflection,
+        ...reviewed,
       };
     } catch (error, stackTrace) {
       debugPrint('GitaDataService: reflections load failed: $error');
@@ -818,9 +842,14 @@ class GitaRepository {
 
     // Emotional searches such as "worry" or "attachment" are expanded into
     // related Gita terms so the offline search feels spiritually useful without
-    // an AI service. Ranking then favors exact references first, followed by
-    // editorial tags/reflections, then scripture text. This mirrors how users
-    // usually search: "2.47" should be exact, while "fear" should find guidance.
+    // an AI service. Ranking still protects direct scripture/reference matches
+    // before editorial tags, so practical notes improve discovery without
+    // burying a verse whose translation contains the user's own words.
+    final originalTerms = normalizedQuery
+        .split(RegExp(r'[\s,;:!?()\[\]"“”‘’]+'))
+        .where((term) => term.trim().length > 1)
+        .map((term) => term.trim())
+        .toSet();
     final expandedQuery = _expandSpiritualSearchQuery(normalizedQuery);
     final terms = expandedQuery
         .split(RegExp(r'[\s,;:!?()\[\]"“”‘’]+'))
@@ -868,7 +897,7 @@ class GitaRepository {
       // 1. exact chapter/verse references
       // 2. tags and topic terms
       // 3. reflection / practice text
-      // 4. translation and meaning
+      // 4. translation and Gita Wisdom Interpretation (stored as meaning)
       // 5. transliteration / Sanskrit matches
       var score = 0;
       final exactReferenceMatch = normalizedQuery == verse.id ||
@@ -892,6 +921,16 @@ class GitaRepository {
       }
       if (translationText.contains(normalizedQuery)) {
         score += 30;
+      }
+      if (originalTerms.isNotEmpty &&
+          originalTerms.every(translationText.contains)) {
+        score += 40;
+      } else if (originalTerms.isNotEmpty &&
+          originalTerms.every(
+            (term) =>
+                translationText.contains(term) || meaningText.contains(term),
+          )) {
+        score += 25;
       }
       if (meaningText.contains(normalizedQuery)) {
         score += 24;

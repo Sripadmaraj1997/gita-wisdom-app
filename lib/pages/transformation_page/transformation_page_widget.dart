@@ -10,10 +10,15 @@ import '../../services/local_storage_service.dart';
 import '../gita_common/gita_common.dart';
 
 class TransformationPageWidget extends StatefulWidget {
-  const TransformationPageWidget({super.key});
+  const TransformationPageWidget({
+    super.key,
+    this.initialJourneyId,
+  });
 
   static String routeName = 'TransformationPage';
   static String routePath = '/transformationPage';
+
+  final String? initialJourneyId;
 
   @override
   State<TransformationPageWidget> createState() =>
@@ -21,7 +26,9 @@ class TransformationPageWidget extends StatefulWidget {
 }
 
 class _TransformationPageWidgetState extends State<TransformationPageWidget> {
-  late Future<Map<String, Set<int>>> _progressFuture;
+  late Future<_JourneyProgressState> _progressFuture;
+  final ScrollController _scrollController = ScrollController();
+  _JourneyCompletionNotice? _completionNotice;
 
   static const _journeys = [
     _Journey(
@@ -510,17 +517,43 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
   @override
   void initState() {
     super.initState();
-    _refresh();
+    _progressFuture = _initializeProgress();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<_JourneyProgressState> _initializeProgress() async {
+    final initialJourneyId = widget.initialJourneyId;
+    if (initialJourneyId != null) {
+      final currentJourneyId = await LocalStorageService.currentJourneyId();
+      if (currentJourneyId != initialJourneyId) {
+        await LocalStorageService.startJourney(initialJourneyId);
+      }
+    }
+    return _loadProgressState();
   }
 
   void _refresh() {
-    _progressFuture = LocalStorageService.journeyProgress();
+    _progressFuture = _loadProgressState();
+  }
+
+  Future<_JourneyProgressState> _loadProgressState() async {
+    return _JourneyProgressState(
+      progress: await LocalStorageService.journeyProgress(),
+      currentJourneyId: await LocalStorageService.currentJourneyId(),
+      currentJourneyDay: await LocalStorageService.currentJourneyDay(),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return GitaScaffold(
       child: ListView(
+        controller: _scrollController,
         key: const PageStorageKey('journeys_scroll_position'),
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 42),
@@ -533,7 +566,7 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 36),
-            child: FutureBuilder<Map<String, Set<int>>>(
+            child: FutureBuilder<_JourneyProgressState>(
               future: _progressFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
@@ -541,37 +574,105 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
                     message: 'Preparing journeys...',
                   );
                 }
-                final progress = snapshot.data ?? <String, Set<int>>{};
+                final state = snapshot.data;
+                final progress = state?.progress ?? <String, Set<int>>{};
                 // Daily progress:
-                // The current journey is the first in-progress path. If the
-                // user has not started one, the first journey becomes the calm
-                // default instead of forcing a setup step.
-                final current = _currentJourney(progress);
+                // Prefer the explicitly selected Journey. This lets a newly
+                // started path with no completed days still appear as current
+                // after restart.
+                final current = _currentJourney(
+                  progress,
+                  selectedJourneyId: state?.currentJourneyId,
+                );
                 final currentCompleted = progress[current.id] ?? <int>{};
                 final currentDay = _nextJourneyDay(current, currentCompleted);
+                final highlightedDay = _highlightedDay(
+                  current,
+                  currentDay,
+                  state?.currentJourneyDay,
+                  currentCompleted,
+                );
+                final currentComplete =
+                    currentCompleted.length >= current.days.length;
+                final completedJourneys = _completedJourneys(progress);
+                final recommendedJourneys = _recommendedJourneys(progress);
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _CurrentJourneyCard(
                       journey: current,
-                      day: currentDay,
+                      day: highlightedDay,
                       completedDays: currentCompleted,
-                      onContinue: () => _openJourneyDay(currentDay),
+                      completionNotice: _completionNotice,
+                      onContinue: () {
+                        _handleContinueJourney(
+                          activeJourneyId: state?.currentJourneyId,
+                          current: current,
+                          highlightedDay: highlightedDay,
+                          nextIncompleteDay: currentDay,
+                          completedDays: currentCompleted,
+                          isComplete: currentComplete,
+                          recommendedJourneys: recommendedJourneys,
+                        );
+                      },
+                      onCompletionContinue: () {
+                        final notice = _completionNotice;
+                        if (notice == null) {
+                          return;
+                        }
+                        _selectJourneyDay(
+                          notice.journey,
+                          notice.nextDay,
+                          scrollToTop: true,
+                        );
+                      },
+                      onCompletionBack: () {
+                        setState(() => _completionNotice = null);
+                        _scrollToDayList();
+                      },
                       onComplete: () => _toggleDay(
                         current,
-                        currentDay,
-                        currentCompleted.contains(currentDay.day),
+                        highlightedDay,
+                        currentCompleted.contains(highlightedDay.day),
                       ),
-                      onJournal: () => _openJournalForDay(currentDay),
+                      onReadVerse: () => _openJourneyVerse(
+                        current,
+                        highlightedDay,
+                      ),
                     ),
+                    if (completedJourneys.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      _CompletedJourneysSection(journeys: completedJourneys),
+                    ],
+                    if (currentComplete && recommendedJourneys.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      _RecommendedJourneysSection(
+                        journeys: recommendedJourneys,
+                        onOpenJourney: (journey) =>
+                            _startNextJourneyFromJourneys(
+                          sheetContext: context,
+                          journey: journey,
+                          closeSheet: false,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     for (final journey in _journeys) ...[
                       _JourneyCard(
                         journey: journey,
                         completedDays: progress[journey.id] ?? <int>{},
+                        currentDay: current.id == journey.id
+                            ? highlightedDay.day
+                            : _nextJourneyDay(
+                                journey,
+                                progress[journey.id] ?? <int>{},
+                              ).day,
                         onToggleDay: _toggleDay,
-                        onOpenDay: _openJourneyDay,
-                        onJournalDay: _openJournalForDay,
+                        onOpenDay: (journey, day) => _selectJourneyDay(
+                          journey,
+                          day,
+                          scrollToTop: true,
+                        ),
                       ),
                       const SizedBox(height: 18),
                     ],
@@ -585,7 +686,25 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     );
   }
 
-  _Journey _currentJourney(Map<String, Set<int>> progress) {
+  _Journey _currentJourney(
+    Map<String, Set<int>> progress, {
+    String? selectedJourneyId,
+  }) {
+    final initialJourneyId = widget.initialJourneyId;
+    if (initialJourneyId != null) {
+      for (final journey in _journeys) {
+        if (journey.id == initialJourneyId) {
+          return journey;
+        }
+      }
+    }
+    if (selectedJourneyId != null) {
+      for (final journey in _journeys) {
+        if (journey.id == selectedJourneyId) {
+          return journey;
+        }
+      }
+    }
     for (final journey in _journeys) {
       final completed = progress[journey.id] ?? <int>{};
       if (completed.isNotEmpty && completed.length < journey.days.length) {
@@ -595,6 +714,30 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     return _journeys.first;
   }
 
+  List<_Journey> _completedJourneys(Map<String, Set<int>> progress) {
+    return [
+      for (final journey in _journeys)
+        if ((progress[journey.id] ?? <int>{}).length >= journey.days.length)
+          journey,
+    ];
+  }
+
+  List<_Journey> _recommendedJourneys(Map<String, Set<int>> progress) {
+    const recommendedIds = [
+      'journey_discipline_14',
+      'journey_anxiety_7',
+      'journey_karma_yoga_14',
+      'journey_clarity_21',
+    ];
+    final completedIds =
+        _completedJourneys(progress).map((journey) => journey.id).toSet();
+    return [
+      for (final id in recommendedIds)
+        for (final journey in _journeys)
+          if (journey.id == id && !completedIds.contains(journey.id)) journey,
+    ];
+  }
+
   _JourneyDay _nextJourneyDay(_Journey journey, Set<int> completedDays) {
     for (final day in journey.days) {
       if (!completedDays.contains(day.day)) {
@@ -602,6 +745,118 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
       }
     }
     return journey.days.last;
+  }
+
+  _JourneyDay _highlightedDay(
+    _Journey journey,
+    _JourneyDay fallback,
+    int? storedDay,
+    Set<int> completedDays,
+  ) {
+    if (storedDay == null) {
+      return fallback;
+    }
+    for (final day in journey.days) {
+      if (day.day == storedDay && !completedDays.contains(day.day)) {
+        return day;
+      }
+    }
+    return fallback;
+  }
+
+  Future<void> _handleContinueJourney({
+    required String? activeJourneyId,
+    required _Journey current,
+    required _JourneyDay highlightedDay,
+    required _JourneyDay nextIncompleteDay,
+    required Set<int> completedDays,
+    required bool isComplete,
+    required List<_Journey> recommendedJourneys,
+  }) async {
+    debugPrint('Continue Journey tapped');
+    debugPrint('activeJourneyId: ${activeJourneyId ?? 'none'}');
+    debugPrint('currentDay: ${highlightedDay.day}');
+    final highlightedCompleted = completedDays.contains(highlightedDay.day);
+    debugPrint('currentDayCompleted: $highlightedCompleted');
+
+    if (activeJourneyId == null || activeJourneyId.isEmpty) {
+      await LocalStorageService.setCurrentJourneyDay(
+        journeyId: current.id,
+        day: highlightedDay.day,
+      );
+      debugPrint('selected journey saved: ${current.id}');
+    }
+
+    if (isComplete) {
+      debugPrint('navigation target: Journey Complete');
+      if (recommendedJourneys.isNotEmpty) {
+        _chooseNextJourney(recommendedJourneys);
+      } else {
+        _showJourneyMessage('You completed ${current.title}.');
+      }
+      return;
+    }
+
+    final targetDay = highlightedCompleted ? nextIncompleteDay : highlightedDay;
+    debugPrint('navigation target: Day ${targetDay.day}');
+    await _selectJourneyDay(current, targetDay, scrollToTop: true);
+    if (!mounted) {
+      return;
+    }
+    if (!highlightedCompleted && targetDay.day == highlightedDay.day) {
+      _showJourneyMessage(
+        'Mark today’s practice complete to unlock the next day.',
+      );
+      return;
+    }
+    _showJourneyMessage('Continue Day ${targetDay.day} before moving forward.');
+  }
+
+  Future<void> _chooseNextJourney(List<_Journey> journeys) async {
+    debugPrint('StartNextJourney tapped');
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => _NextJourneySheet(
+        journeys: journeys,
+        onSelect: (journey) => _startNextJourneyFromJourneys(
+          sheetContext: sheetContext,
+          journey: journey,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startNextJourneyFromJourneys({
+    required BuildContext sheetContext,
+    required _Journey journey,
+    bool closeSheet = true,
+  }) async {
+    debugPrint('selected journey id ${journey.id}');
+    await LocalStorageService.startJourney(journey.id);
+    debugPrint('navigation target JourneyDay ${journey.id} day 1');
+    if (!mounted || !sheetContext.mounted) {
+      return;
+    }
+    if (closeSheet) {
+      Navigator.of(sheetContext).pop();
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Journey started',
+          style: gitaBody(color: kText, weight: FontWeight.w800),
+        ),
+        backgroundColor: kRoyalPurple,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    setState(() {
+      _completionNotice = null;
+      _refresh();
+    });
+    _scrollToCurrentJourney();
   }
 
   Future<void> _toggleDay(
@@ -616,26 +871,127 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
       journeyId: journey.id,
       day: day.day,
       complete: !completed,
+      totalDays: journey.days.length,
     );
+    if (!completed) {
+      final nextDay = _nextJourneyDay(
+        journey,
+        {
+          ...await LocalStorageService.completedJourneyDays(journey.id),
+        },
+      );
+      await LocalStorageService.setCurrentJourneyDay(
+        journeyId: journey.id,
+        day: nextDay.day,
+      );
+      if (mounted) {
+        final nextLabel = day.day >= journey.days.length
+            ? 'You completed ${journey.title}.'
+            : 'Next: Day ${nextDay.day} — ${nextDay.title}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Progress saved\n$nextLabel',
+              style: gitaBody(color: kText, weight: FontWeight.w800),
+            ),
+            backgroundColor: kRoyalPurple,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      _completionNotice = _JourneyCompletionNotice(
+        journey: journey,
+        completedDay: day,
+        nextDay: nextDay,
+      );
+    } else {
+      _completionNotice = null;
+    }
     if (!mounted) {
       return;
     }
     setState(_refresh);
+    if (!completed) {
+      _scrollToCurrentJourney();
+    }
   }
 
-  void _openJourneyDay(_JourneyDay day) {
+  Future<void> _selectJourneyDay(
+    _Journey journey,
+    _JourneyDay day, {
+    bool scrollToTop = false,
+  }) async {
+    await LocalStorageService.setCurrentJourneyDay(
+      journeyId: journey.id,
+      day: day.day,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _completionNotice = null;
+      _refresh();
+    });
+    if (scrollToTop) {
+      _scrollToCurrentJourney();
+    }
+  }
+
+  void _scrollToCurrentJourney() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _scrollToDayList() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.animateTo(
+        360,
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _showJourneyMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: gitaBody(color: kText, weight: FontWeight.w800),
+          ),
+          backgroundColor: kRoyalPurple,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  void _openJourneyVerse(_Journey journey, _JourneyDay day) {
+    final nextDay = day.day < journey.days.length
+        ? journey.days[day.day]
+        : journey.days.last;
     context.push(Uri(
       path: '/verseReaderPage',
-      queryParameters: {'verseId': day.verseId},
-    ).toString());
-  }
-
-  void _openJournalForDay(_JourneyDay day) {
-    context.push(Uri(
-      path: '/journalPage',
       queryParameters: {
-        'prefill': day.journalPrompt,
-        'chapter': day.verseId.split('.').first,
+        'verseId': day.verseId,
+        'journeyId': journey.id,
+        'journeyName': journey.title,
+        'journeyDay': day.day.toString(),
+        'journeyTotalDays': journey.days.length.toString(),
+        'journeyDayTitle': day.title,
+        'nextJourneyDayTitle': nextDay.title,
       },
     ).toString());
   }
@@ -646,29 +1002,40 @@ class _CurrentJourneyCard extends StatelessWidget {
     required this.journey,
     required this.day,
     required this.completedDays,
+    required this.completionNotice,
     required this.onContinue,
+    required this.onCompletionContinue,
+    required this.onCompletionBack,
     required this.onComplete,
-    required this.onJournal,
+    required this.onReadVerse,
   });
 
   final _Journey journey;
   final _JourneyDay day;
   final Set<int> completedDays;
+  final _JourneyCompletionNotice? completionNotice;
   final VoidCallback onContinue;
+  final VoidCallback onCompletionContinue;
+  final VoidCallback onCompletionBack;
   final VoidCallback onComplete;
-  final VoidCallback onJournal;
+  final VoidCallback onReadVerse;
 
   @override
   Widget build(BuildContext context) {
     final completedCount = completedDays.length;
     final isCompleted = completedDays.contains(day.day);
+    final isJourneyComplete = completedCount >= journey.days.length;
+    final nextDay = day.day < journey.days.length
+        ? journey.days[day.day]
+        : journey.days.last;
     return PremiumCard(
       accent: true,
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AccentPill('Current Journey'),
+          AccentPill(
+              isJourneyComplete ? 'Journey Complete' : 'Current Journey'),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,7 +1052,9 @@ class _CurrentJourneyCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Day ${day.day} of ${journey.days.length}',
+                      isJourneyComplete
+                          ? '${journey.days.length} of ${journey.days.length} days complete'
+                          : 'Day ${day.day} of ${journey.days.length}',
                       style: gitaBody(
                         color: kAntiqueGold,
                         weight: FontWeight.w900,
@@ -708,31 +1077,384 @@ class _CurrentJourneyCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          _JourneyDayDetail(day: day),
-          const SizedBox(height: 16),
+          if (isJourneyComplete) ...[
+            Text(
+              'You completed ${journey.title}.',
+              style: gitaBody(
+                color: kText,
+                size: 16,
+                weight: FontWeight.w900,
+              ).copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 10),
+            const _JourneyCompletionDetail(),
+          ] else
+            _JourneyDayDetail(day: day),
+          if (!isJourneyComplete && day.day < journey.days.length) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Next: Day ${nextDay.day} — ${nextDay.title}',
+              style: gitaBody(
+                color: kAntiqueGold,
+                size: 13,
+                weight: FontWeight.w900,
+              ).copyWith(height: 1.4),
+            ),
+          ],
+          if (completionNotice != null) ...[
+            const SizedBox(height: 14),
+            _DayCompleteCard(
+              notice: completionNotice!,
+              onContinue: onCompletionContinue,
+              onBackToJourney: onCompletionBack,
+            ),
+          ],
+          if (completionNotice == null) ...[
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                GoldButton(
+                  label: isJourneyComplete
+                      ? 'Choose Next Journey'
+                      : 'Continue Journey',
+                  icon: isJourneyComplete
+                      ? Icons.route_rounded
+                      : Icons.play_arrow_rounded,
+                  onPressed: onContinue,
+                ),
+                if (!isJourneyComplete)
+                  _JourneyMiniAction(
+                    icon: isCompleted
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    label: isCompleted ? 'Completed' : 'Complete Day',
+                    onTap: onComplete,
+                  ),
+                if (!isJourneyComplete)
+                  _JourneyMiniAction(
+                    icon: Icons.menu_book_rounded,
+                    label: 'Read Verse',
+                    onTap: onReadVerse,
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _JourneyCompletionDetail extends StatelessWidget {
+  const _JourneyCompletionDetail();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCream,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: kGold.withValues(alpha: 0.24)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DetailLine(
+            label: 'Reflection',
+            text: 'What insight will you carry forward?',
+          ),
+          SizedBox(height: 12),
+          _DetailLine(
+            label: 'Continue',
+            text: 'What practice will you continue?',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayCompleteCard extends StatelessWidget {
+  const _DayCompleteCard({
+    required this.notice,
+    required this.onContinue,
+    required this.onBackToJourney,
+  });
+
+  final _JourneyCompletionNotice notice;
+  final VoidCallback onContinue;
+  final VoidCallback onBackToJourney;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFinalDay = notice.completedDay.day >= notice.journey.days.length;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCream,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: kGold.withValues(alpha: 0.34)),
+        boxShadow: [
+          BoxShadow(
+            color: kGold.withValues(alpha: 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: kGold, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Day Complete ✓',
+                  style: gitaBody(color: kDarkText, weight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            isFinalDay
+                ? 'You completed ${notice.journey.title}.'
+                : 'Next: Day ${notice.nextDay.day} — ${notice.nextDay.title}',
+            style: gitaBody(
+              color: kRoyalPurple,
+              weight: FontWeight.w900,
+            ).copyWith(height: 1.45),
+          ),
+          if (isFinalDay) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Pause with what this journey opened, then choose the next path gently.',
+              style: gitaBody(color: kDarkText, size: 13).copyWith(
+                height: 1.45,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
               GoldButton(
-                label: 'Continue Journey',
-                icon: Icons.play_arrow_rounded,
+                label: isFinalDay ? 'Choose Next Journey' : 'Continue Journey',
+                icon: Icons.route_rounded,
                 onPressed: onContinue,
               ),
-              _JourneyMiniAction(
-                icon: isCompleted
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                label: isCompleted ? 'Completed' : 'Mark Complete',
-                onTap: onComplete,
-              ),
-              _JourneyMiniAction(
-                icon: Icons.edit_note_rounded,
-                label: 'Journal',
-                onTap: onJournal,
+              _LightJourneyButton(
+                label: 'Back to Journey',
+                icon: Icons.arrow_back_rounded,
+                onTap: onBackToJourney,
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompletedJourneysSection extends StatelessWidget {
+  const _CompletedJourneysSection({required this.journeys});
+
+  final List<_Journey> journeys;
+
+  @override
+  Widget build(BuildContext context) {
+    return PremiumCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AccentPill('Completed Journeys'),
+          const SizedBox(height: 14),
+          for (final journey in journeys) ...[
+            Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: kGold, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    journey.title,
+                    style: gitaBody(color: kText, weight: FontWeight.w900),
+                  ),
+                ),
+                Text(
+                  '${journey.days.length}/${journey.days.length}',
+                  style: gitaBody(
+                    color: kMuted,
+                    size: 13,
+                    weight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            if (journey != journeys.last) const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _NextJourneySheet extends StatelessWidget {
+  const _NextJourneySheet({
+    required this.journeys,
+    required this.onSelect,
+  });
+
+  final List<_Journey> journeys;
+  final Future<void> Function(_Journey journey) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
+        decoration: BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: kGold.withValues(alpha: 0.24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 28,
+              offset: const Offset(0, 18),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AccentPill('Choose Your Next Journey'),
+            const SizedBox(height: 14),
+            Text(
+              'Begin gently with a path that fits this season.',
+              style: gitaBody(color: kMuted, size: 13).copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 14),
+            for (final journey in journeys) ...[
+              PressableScale(
+                onTap: () => onSelect(journey),
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  key: ValueKey('next_journey_${journey.id}'),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: kCream,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: kGold.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      IconMedallion(icon: journey.icon, size: 38),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              journey.title,
+                              style: gitaBody(
+                                color: kDarkText,
+                                weight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${journey.days.length} days',
+                              style: gitaBody(
+                                color: kDarkText.withValues(alpha: 0.66),
+                                size: 12,
+                                weight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: kGold,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (journey != journeys.last) const SizedBox(height: 10),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendedJourneysSection extends StatelessWidget {
+  const _RecommendedJourneysSection({
+    required this.journeys,
+    required this.onOpenJourney,
+  });
+
+  final List<_Journey> journeys;
+  final ValueChanged<_Journey> onOpenJourney;
+
+  @override
+  Widget build(BuildContext context) {
+    return PremiumCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AccentPill('Recommended Next'),
+          const SizedBox(height: 14),
+          for (final journey in journeys) ...[
+            PressableScale(
+              onTap: () => onOpenJourney(journey),
+              borderRadius: BorderRadius.circular(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconMedallion(icon: journey.icon, size: 38),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          journey.title,
+                          style:
+                              gitaBody(color: kText, weight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          journey.subtitle,
+                          style: gitaBody(color: kMuted, size: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: kGold),
+                ],
+              ),
+            ),
+            if (journey != journeys.last) const SizedBox(height: 14),
+          ],
         ],
       ),
     );
@@ -743,17 +1465,17 @@ class _JourneyCard extends StatelessWidget {
   const _JourneyCard({
     required this.journey,
     required this.completedDays,
+    required this.currentDay,
     required this.onToggleDay,
     required this.onOpenDay,
-    required this.onJournalDay,
   });
 
   final _Journey journey;
   final Set<int> completedDays;
+  final int currentDay;
   final Future<void> Function(_Journey journey, _JourneyDay day, bool completed)
       onToggleDay;
-  final ValueChanged<_JourneyDay> onOpenDay;
-  final ValueChanged<_JourneyDay> onJournalDay;
+  final Future<void> Function(_Journey journey, _JourneyDay day) onOpenDay;
 
   @override
   Widget build(BuildContext context) {
@@ -800,17 +1522,25 @@ class _JourneyCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           for (final day in journey.days) ...[
-            _JourneyDayRow(
-              day: day,
-              completed: completedDays.contains(day.day),
-              onToggle: () => onToggleDay(
-                journey,
-                day,
-                completedDays.contains(day.day),
-              ),
-              onOpen: () => onOpenDay(day),
-              onJournal: () => onJournalDay(day),
-            ),
+            Builder(builder: (context) {
+              final completed = completedDays.contains(day.day);
+              final current = currentDay == day.day;
+              final locked = !completed && !current && day.day > currentDay;
+              return _JourneyDayRow(
+                day: day,
+                completed: completed,
+                current: current,
+                locked: locked,
+                onToggle: locked
+                    ? null
+                    : () => onToggleDay(
+                          journey,
+                          day,
+                          completed,
+                        ),
+                onOpen: locked ? null : () => onOpenDay(journey, day),
+              );
+            }),
             if (day != journey.days.last) const SizedBox(height: 10),
           ],
         ],
@@ -823,30 +1553,40 @@ class _JourneyDayRow extends StatelessWidget {
   const _JourneyDayRow({
     required this.day,
     required this.completed,
+    required this.current,
+    required this.locked,
     required this.onToggle,
     required this.onOpen,
-    required this.onJournal,
   });
 
   final _JourneyDay day;
   final bool completed;
-  final VoidCallback onToggle;
-  final VoidCallback onOpen;
-  final VoidCallback onJournal;
+  final bool current;
+  final bool locked;
+  final VoidCallback? onToggle;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: completed
-            ? kGold.withValues(alpha: 0.12)
-            : kCard2.withValues(alpha: 0.74),
+        color: current
+            ? kGold.withValues(alpha: 0.18)
+            : completed
+                ? kGold.withValues(alpha: 0.12)
+                : locked
+                    ? kCard2.withValues(alpha: 0.40)
+                    : kCard2.withValues(alpha: 0.74),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: completed
-              ? kGold.withValues(alpha: 0.38)
-              : kLine.withValues(alpha: 0.8),
+          color: current
+              ? kGold
+              : completed
+                  ? kGold.withValues(alpha: 0.38)
+                  : locked
+                      ? kLine.withValues(alpha: 0.48)
+                      : kLine.withValues(alpha: 0.8),
         ),
       ),
       child: Row(
@@ -856,10 +1596,12 @@ class _JourneyDayRow extends StatelessWidget {
             onTap: onToggle,
             borderRadius: BorderRadius.circular(100),
             child: Icon(
-              completed
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: completed ? kGold : kMuted,
+              locked
+                  ? Icons.lock_outline_rounded
+                  : completed
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+              color: completed ? kGold : kMuted.withValues(alpha: 0.72),
               size: 26,
             ),
           ),
@@ -875,6 +1617,28 @@ class _JourneyDayRow extends StatelessWidget {
                     'Day ${day.day}: ${day.title}',
                     style: gitaBody(color: kText, weight: FontWeight.w900),
                   ),
+                  if (current) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Current day',
+                      style: gitaBody(
+                        color: kAntiqueGold,
+                        size: 12,
+                        weight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                  if (locked) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Upcoming',
+                      style: gitaBody(
+                        color: kMuted,
+                        size: 12,
+                        weight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     'Bhagavad Gita ${day.verseId}',
@@ -885,12 +1649,7 @@ class _JourneyDayRow extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Journal prompt',
-            onPressed: onJournal,
-            icon: const Icon(Icons.edit_note_rounded, color: kGold),
-          ),
-          IconButton(
-            tooltip: 'Open verse',
+            tooltip: 'View journey day',
             onPressed: onOpen,
             icon: const Icon(Icons.chevron_right_rounded, color: kGold),
           ),
@@ -1010,6 +1769,73 @@ class _JourneyMiniAction extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LightJourneyButton extends StatelessWidget {
+  const _LightJourneyButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(100),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        decoration: BoxDecoration(
+          color: kCard.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: kGold.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: kGold, size: 16),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: gitaBody(
+                color: kText,
+                size: 12,
+                weight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _JourneyProgressState {
+  const _JourneyProgressState({
+    required this.progress,
+    required this.currentJourneyId,
+    required this.currentJourneyDay,
+  });
+
+  final Map<String, Set<int>> progress;
+  final String? currentJourneyId;
+  final int currentJourneyDay;
+}
+
+class _JourneyCompletionNotice {
+  const _JourneyCompletionNotice({
+    required this.journey,
+    required this.completedDay,
+    required this.nextDay,
+  });
+
+  final _Journey journey;
+  final _JourneyDay completedDay;
+  final _JourneyDay nextDay;
 }
 
 class _Journey {

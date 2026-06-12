@@ -1,42 +1,40 @@
 # Gita Wisdom Privacy Policy
 
-Effective date: May 22, 2026
+Effective date: June 7, 2026
 
-Gita Wisdom is a Bhagavad Gita reading, journaling, saved verse, and spiritual guidance app. This policy explains how the MVP handles information.
+Gita Wisdom is a Bhagavad Gita reading, journaling, saved verse, and spiritual guidance app. This policy explains how the local/offline MVP handles information.
 
 ## Information We Collect
 
-Gita Wisdom may collect:
+Gita Wisdom stores locally on your device:
 
-- Email address and display name for Firebase Authentication.
-- Saved verses and journal entries created by you.
-- Owner Wisdom interpretations created by the configured owner/admin account.
-- Notification preference for the daily verse reminder.
-- Ask Gita questions and relevant context when AI features are enabled.
+- Saved verses and highlights.
+- Journal entries created by you.
+- Ask Gita Lite question history.
+- Reading preferences, current journey progress, and continue-reading progress.
 
 ## How We Use Information
 
-We use information to:
+We use local information to:
 
-- Sign you in and keep your account available across devices.
-- Save your journal entries and saved verses.
-- Show daily verse reminders when enabled.
-- Provide Ask Gita AI responses using relevant Gita and Owner Wisdom context.
-- Maintain app security and prevent unauthorized access.
+- Show your saved verses, highlights, and journal entries.
+- Restore your reading place and Journey progress.
+- Keep reader preferences such as font size and Sanskrit/transliteration visibility.
+- Provide Ask Gita Lite responses using local Bhagavad Gita data.
 
 We do not sell personal information.
 
-## Ask Gita AI
+## Ask Gita Lite
 
-When Ask Gita AI is enabled, your question and relevant app context may be sent to an AI provider to generate a response. Do not enter sensitive personal, medical, legal, or financial information. AI responses are for spiritual reflection only and are not medical, legal, financial, or professional advice.
+Ask Gita Lite uses local retrieval and local Bhagavad Gita content. The current MVP does not send questions to OpenAI or another AI provider. Do not enter sensitive personal, medical, legal, or financial information. Responses are for spiritual reflection only and are not medical, legal, financial, or professional advice.
 
 ## Storage and Security
 
-The app uses Firebase Authentication and Cloud Firestore. Firestore security rules are designed so user-owned content such as journals and saved verses is available only to the signed-in user. Owner-only content is restricted to the configured owner/admin account.
+The current MVP does not require login and does not use Firebase. User-owned content is stored in local device storage using app preferences. Clearing app data or using the in-app clear data action removes local saved content from the device.
 
 ## Your Choices
 
-You can delete journal entries and saved verses in the app. You can turn daily reminders on or off in Settings. You can sign out from Settings at any time.
+You can delete journal entries, saved verses, highlights, Ask Gita history, Journey progress, and reader preferences from Settings using Clear Saved Data.
 
 ## Children
 

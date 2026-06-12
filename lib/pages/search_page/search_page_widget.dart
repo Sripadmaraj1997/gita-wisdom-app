@@ -1,9 +1,10 @@
 // Gita search screen.
 //
-// Searches local scripture, reflections, Practice Today text, tags, and verse
-// references. Topic chips seed emotional searches such as peace, fear, anger,
-// and attachment. Ranking lives in GitaRepository.search so SearchScreen only
-// handles UX state and exact navigation into Verse Reader.
+// Searches local scripture, Gita Wisdom Interpretation, reflections, Practice
+// Today text, tags, and verse references. Topic chips seed emotional searches
+// such as peace, fear, anger, and attachment. Ranking lives in
+// GitaRepository.search so SearchScreen only handles UX state and exact
+// navigation into Verse Reader.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -209,16 +210,16 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                         debugPrint('Gita search failed: ${snapshot.error}');
                         return const ErrorStateCard(
                           message:
-                              'Could not search the Gita right now. Please check the chapter JSON files.',
+                              'Search is resting for a moment. Please try again.',
                         );
                       }
                       final results = snapshot.data ?? const [];
                       if (results.isEmpty) {
                         return const EmptyStateCard(
                           icon: Icons.search_off_rounded,
-                          title: 'No matching verses found.',
+                          title: 'No matching verse surfaced yet.',
                           body:
-                              'Try peace, duty, fear, anger, attachment, or purpose.',
+                              'Peace often begins with a single verse. Try peace, duty, fear, attachment, or purpose.',
                         );
                       }
                       return Column(
@@ -338,35 +339,45 @@ class _SearchResultCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (verse.englishTranslation.trim().isNotEmpty) ...[
+                  _PreviewBlock(
+                    label: 'Translation',
+                    text: verse.englishTranslation,
+                    query: query,
+                    maxLines: 3,
+                  ),
+                ],
+                if (verse.gitaWisdomInterpretation.trim().isNotEmpty) ...[
+                  if (verse.englishTranslation.trim().isNotEmpty)
+                    const SizedBox(height: 12),
+                  _PreviewBlock(
+                    label: 'Gita Wisdom Interpretation',
+                    text: verse.gitaWisdomInterpretation,
+                    query: query,
+                    maxLines: 3,
+                  ),
+                ],
                 if (verse.reflectionText.trim().isNotEmpty) ...[
+                  if (verse.englishTranslation.trim().isNotEmpty ||
+                      verse.gitaWisdomInterpretation.trim().isNotEmpty)
+                    const SizedBox(height: 12),
                   _PreviewBlock(
                     label: 'Reflection',
                     text: verse.reflectionText,
                     query: query,
                     maxLines: 3,
                   ),
-                  const SizedBox(height: 12),
                 ],
-                if (verse.englishTranslation.trim().isNotEmpty) ...[
-                  _HighlightedSnippet(
-                    text: verse.englishTranslation,
-                    query: query,
-                    style: gitaBody(
-                      color: kDarkText,
-                      size: 16,
-                      weight: FontWeight.w800,
-                    ),
-                    maxLines: 3,
-                  ),
-                ],
-                if (_secondaryPreviewText(verse).trim().isNotEmpty) ...[
-                  if (verse.englishTranslation.trim().isNotEmpty)
-                    const SizedBox(height: 10),
+                if (verse.practiceToday.trim().isNotEmpty) ...[
+                  if (verse.englishTranslation.trim().isNotEmpty ||
+                      verse.gitaWisdomInterpretation.trim().isNotEmpty ||
+                      verse.reflectionText.trim().isNotEmpty)
+                    const SizedBox(height: 12),
                   _PreviewBlock(
-                    label: _secondaryPreviewLabel(verse),
-                    text: _secondaryPreviewText(verse),
+                    label: 'Practice Today',
+                    text: verse.practiceToday,
                     query: query,
-                    maxLines: 3,
+                    maxLines: 2,
                   ),
                 ],
               ],
@@ -579,28 +590,4 @@ class _HighlightedSnippet extends StatelessWidget {
       text: TextSpan(style: style, children: spans),
     );
   }
-}
-
-String _secondaryPreviewLabel(GitaVerseData verse) {
-  final practiceToday = verse.practiceToday.trim();
-  if (practiceToday.isNotEmpty) {
-    return 'Practice Today';
-  }
-  final meaning = verse.cleanMeaning.trim();
-  if (meaning.isNotEmpty) {
-    return 'Meaning';
-  }
-  return 'Translation';
-}
-
-String _secondaryPreviewText(GitaVerseData verse) {
-  final practiceToday = verse.practiceToday.trim();
-  if (practiceToday.isNotEmpty) {
-    return practiceToday;
-  }
-  final meaning = verse.cleanMeaning.trim();
-  if (meaning.isNotEmpty) {
-    return meaning;
-  }
-  return verse.englishTranslation;
 }

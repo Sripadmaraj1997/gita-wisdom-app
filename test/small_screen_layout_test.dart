@@ -8,6 +8,7 @@ import 'package:gita_wisdom/pages/search_page/search_page_widget.dart';
 import 'package:gita_wisdom/pages/settings_page/settings_page_widget.dart';
 import 'package:gita_wisdom/pages/transformation_page/transformation_page_widget.dart';
 import 'package:gita_wisdom/pages/verse_reader_page/verse_reader_page_widget.dart';
+import 'package:gita_wisdom/services/local_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -88,5 +89,43 @@ void main() {
     expect(transliterationRect.top, lessThan(568));
     expect(find.text('Translation'), findsOneWidget);
     expect(translationRect.top, lessThan(568));
+  });
+
+  testWidgets('VerseReader shows compact journey context', (
+    tester,
+  ) async {
+    await tester.runAsync(() => GitaRepository.load());
+    await pumpSmallScreen(
+      tester,
+      const VerseReaderPageWidget(
+        verseId: '2.47',
+        journeyId: 'journey_peace_7',
+        journeyName: 'Journey to Peace',
+        journeyDay: 1,
+        journeyTotalDays: 7,
+        journeyDayTitle: 'Act without clinging',
+        nextJourneyDayTitle: 'Feelings pass',
+      ),
+    );
+    await pumpUntilFound(tester, find.textContaining('Journey to Peace'));
+
+    expect(
+      find.text('Journey to Peace • Day 1 of 7'),
+      findsOneWidget,
+    );
+    expect(find.text('Mark Day Complete'), findsNothing);
+    expect(find.text('Day Complete ✓'), findsNothing);
+    expect(find.text('Continue Journey'), findsNothing);
+    expect(find.textContaining('कर्मण्येवाधिकारस्ते'), findsOneWidget);
+    expect(find.textContaining('karmaṇyevādhikāraste'), findsOneWidget);
+    expect(find.text('Translation'), findsOneWidget);
+
+    final currentJourneyId =
+        await tester.runAsync(LocalStorageService.currentJourneyId);
+    final currentJourneyDay =
+        await tester.runAsync(LocalStorageService.currentJourneyDay);
+
+    expect(currentJourneyId, 'journey_peace_7');
+    expect(currentJourneyDay, 1);
   });
 }

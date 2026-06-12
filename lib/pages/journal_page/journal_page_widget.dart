@@ -175,8 +175,8 @@ class _JournalPageWidgetState extends State<JournalPageWidget> {
                       debugPrint(
                           'Journal entries load failed: ${snapshot.error}');
                       return const _JournalEmptyState(
-                        title: 'Could not load journal.',
-                        body: 'Your local journal data could not be read.',
+                        title: 'Your journal is resting for a moment.',
+                        body: 'Please return in a little while.',
                       );
                     }
                     final entries = snapshot.data ?? const [];
@@ -281,7 +281,7 @@ class _JournalEntryCard extends StatelessWidget {
               entry.text,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: gitaBody(color: kDarkText, size: 14).copyWith(height: 1.5),
+              style: gitaBody(color: kDarkText, size: 16).copyWith(height: 1.5),
             ),
           ),
           if (entry.intention.isNotEmpty ||
@@ -659,7 +659,7 @@ class _JournalTextField extends StatelessWidget {
       controller: controller,
       minLines: minLines,
       maxLines: maxLines,
-      style: gitaBody(color: kDarkText, size: 15),
+      style: gitaBody(color: kDarkText, size: 16),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: gitaBody(color: kCard2),

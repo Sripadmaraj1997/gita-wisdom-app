@@ -1,7 +1,7 @@
 // Premium scripture reader.
 //
 // Shows one verse at a time with Sanskrit, transliteration, translation,
-// commentary, reflection, and Practice Today. The top verse content remains
+// interpretation, reflection, and Practice Today. The top verse content remains
 // immediately visible, while long explanations scroll below. Previous/Next
 // controls stay fixed at the bottom. Verse audio is lazy-loaded only after the
 // user taps Play so app startup and chapter navigation never wait on audio.
@@ -26,12 +26,30 @@ class VerseReaderPageWidget extends StatefulWidget {
   const VerseReaderPageWidget({
     super.key,
     this.verseId,
+    this.journeyId,
+    this.journeyName,
+    this.journeyDay,
+    this.journeyTotalDays,
+    this.journeyDayTitle,
+    this.nextJourneyDayTitle,
   });
 
   static String routeName = 'VerseReaderPage';
   static String routePath = '/verseReaderPage';
 
   final String? verseId;
+  final String? journeyId;
+  final String? journeyName;
+  final int? journeyDay;
+  final int? journeyTotalDays;
+  final String? journeyDayTitle;
+  final String? nextJourneyDayTitle;
+
+  bool get hasJourneyContext =>
+      journeyId != null &&
+      journeyName != null &&
+      journeyDay != null &&
+      journeyTotalDays != null;
 
   @override
   State<VerseReaderPageWidget> createState() => _VerseReaderPageWidgetState();
@@ -61,6 +79,12 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
     // reparse JSON or recreate chapter lists.
     _bundleFuture = GitaDataService.load();
     unawaited(_loadReaderSettings());
+    if (widget.hasJourneyContext) {
+      unawaited(LocalStorageService.setCurrentJourneyDay(
+        journeyId: widget.journeyId!,
+        day: widget.journeyDay!,
+      ));
+    }
   }
 
   @override
@@ -101,7 +125,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                   padding: EdgeInsets.all(20),
                   child: ErrorStateCard(
                     message:
-                        'Could not load verse data from assets/data/gita/. Please check the chapter JSON files and try again.',
+                        'This verse is resting for a moment. Please try again.',
                   ),
                 ),
               ],
@@ -124,7 +148,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                   padding: EdgeInsets.all(20),
                   child: ErrorStateCard(
                     message:
-                        'Could not find verses for this chapter. Please check the chapter JSON files.',
+                        'Verses for this chapter are not available right now.',
                   ),
                 ),
               ],
@@ -150,6 +174,16 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                       ? 'Chapter ${currentVerse.chapterNumber}'
                       : 'Chapter ${currentChapter.chapterNumber}: ${currentChapter.title}',
                 ),
+                if (widget.hasJourneyContext)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                    child: _JourneyReaderRow(
+                      journeyName: widget.journeyName!,
+                      journeyDay: widget.journeyDay!,
+                      totalDays: widget.journeyTotalDays!,
+                      onBackToJourney: _backToJourney,
+                    ),
+                  ),
                 Expanded(
                   child: PageView.builder(
                     // Previous / next navigation:
@@ -176,8 +210,9 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
                             index == chapterVerses.length - 1 ? 300 : 110,
                       );
                       return SingleChildScrollView(
-                        // Scroll padding keeps Translation, Reflection, and
-                        // Practice Today clear of fixed navigation controls.
+                        // Scroll padding keeps Translation, Gita Wisdom
+                        // Interpretation, Reflection, and Practice Today clear
+                        // of fixed navigation controls.
                         padding: EdgeInsets.fromLTRB(
                           20,
                           0,
@@ -334,6 +369,13 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
   void _setFontSize(double value) {
     setState(() => _fontSize = value);
     unawaited(LocalStorageService.setReaderFontScale(value));
+  }
+
+  Future<void> _backToJourney() async {
+    final popped = await Navigator.of(context).maybePop();
+    if (!popped && mounted) {
+      context.go('/transformationPage');
+    }
   }
 
   void _goToPreviousVerse() {
@@ -614,7 +656,7 @@ class _ReaderTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
       child: Row(
         children: [
           AnimatedGoldIconButton(
@@ -630,13 +672,59 @@ class _ReaderTopBar extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: gitaTitle(22).copyWith(
+              style: gitaTitle(18).copyWith(
                 color: kAntiqueGold,
                 height: 1.15,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _JourneyReaderRow extends StatelessWidget {
+  const _JourneyReaderRow({
+    required this.journeyName,
+    required this.journeyDay,
+    required this.totalDays,
+    required this.onBackToJourney,
+  });
+
+  final String journeyName;
+  final int journeyDay;
+  final int totalDays;
+  final VoidCallback onBackToJourney;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onBackToJourney,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          child: Row(
+            children: [
+              const Icon(Icons.arrow_back_rounded, color: kGold, size: 17),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '$journeyName • Day $journeyDay of $totalDays',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: gitaBody(
+                    color: kAntiqueGold,
+                    size: 13,
+                    weight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -830,16 +918,16 @@ class _VerseContentCard extends StatelessWidget {
     final sanskrit = verse.sanskrit.trim();
     final transliteration = verse.transliteration.trim();
     final translation = verse.englishTranslation.trim();
-    final meaning = verse.cleanMeaning;
+    final interpretation = verse.gitaWisdomInterpretation;
     final progressValue =
         totalVerses <= 0 ? 0.0 : (currentIndex + 1) / totalVerses;
     final isCompactHeight = MediaQuery.sizeOf(context).height < 700;
-    final sanskritSize = (isCompactHeight ? 23.0 : 28.0) * fontSize;
+    final sanskritSize = (isCompactHeight ? 22.0 : 28.0) * fontSize;
     final transliterationSize = (isCompactHeight ? 16.0 : 18.0) * fontSize;
-    final sanskritMaxHeight = isCompactHeight ? 108.0 : 190.0;
-    final transliterationMaxHeight = isCompactHeight ? 68.0 : 128.0;
-    final sectionGap = isCompactHeight ? 12.0 : 18.0;
-    final translationGap = isCompactHeight ? 14.0 : 22.0;
+    final sanskritMaxHeight = isCompactHeight ? 88.0 : 170.0;
+    final transliterationMaxHeight = isCompactHeight ? 52.0 : 112.0;
+    final sectionGap = isCompactHeight ? 10.0 : 16.0;
+    final translationGap = isCompactHeight ? 12.0 : 18.0;
     final content = PremiumCard(
       accent: true,
       padding: EdgeInsets.zero,
@@ -847,7 +935,12 @@ class _VerseContentCard extends StatelessWidget {
         key: ValueKey('${verse.id}-$isFocusMode'),
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+        padding: EdgeInsets.fromLTRB(
+          18,
+          isCompactHeight ? 14 : 18,
+          18,
+          isCompactHeight ? 16 : 20,
+        ),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           gradient: LinearGradient(
@@ -878,18 +971,19 @@ class _VerseContentCard extends StatelessWidget {
           children: [
             _ReadingProgressHeader(
               chapterNumber: verse.chapterNumber,
-              verseNumber: currentIndex + 1,
-              totalVerses: totalVerses,
+              verseNumber: verse.verseNumber,
               progressValue: progressValue,
               isFocusMode: isFocusMode,
               onFocusToggle: () => onFocusModeChanged(!isFocusMode),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: isCompactHeight ? 12 : 18),
             // Reading-first layout:
             // Sanskrit and transliteration are shown exactly from local JSON
             // when available. Missing fields are hidden instead of replaced
             // with generated or placeholder text.
             if (showSanskrit && sanskrit.isNotEmpty) ...[
+              const _ReadingSectionLabel('Sanskrit'),
+              const SizedBox(height: 8),
               _ResponsiveReaderText(
                 text: sanskrit,
                 maxHeight: sanskritMaxHeight,
@@ -908,6 +1002,8 @@ class _VerseContentCard extends StatelessWidget {
               SizedBox(height: sectionGap),
             ],
             if (showTransliteration && transliteration.isNotEmpty) ...[
+              const _ReadingSectionLabel('Transliteration'),
+              const SizedBox(height: 8),
               _ResponsiveReaderText(
                 text: transliteration,
                 maxHeight: transliterationMaxHeight,
@@ -928,11 +1024,11 @@ class _VerseContentCard extends StatelessWidget {
                 translation: translation,
                 fontSize: fontSize,
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: isCompactHeight ? 10 : 14),
             ],
             _VerseBottomActions(
               // Compact action row:
-              // Save, share, highlight, and audio stay below the primary
+              // Save, share, play, and highlight stay below the primary
               // reading content and never become a separate vertical panel.
               verse: verse,
               isSavedBusy: isSavedBusy,
@@ -949,12 +1045,13 @@ class _VerseContentCard extends StatelessWidget {
               const SizedBox(height: 24),
               const _ElegantDivider(),
               const SizedBox(height: 22),
-              if (meaning.isNotEmpty) ...[
+              if (interpretation.isNotEmpty) ...[
                 // Reflection flow:
-                // Meaning, Reflection, and Practice Today stay as separate
-                // study cards so translation never blends into commentary.
-                _MeaningPanel(
-                  meaning: meaning,
+                // The app's interpretation layer, Reflection, and Practice
+                // Today stay as separate study cards so scripture translation
+                // never blends into practical understanding.
+                _GitaWisdomInterpretationPanel(
+                  interpretation: interpretation,
                   fontSize: fontSize,
                 ),
                 const SizedBox(height: 16),
@@ -1003,7 +1100,6 @@ class _ReadingProgressHeader extends StatelessWidget {
   const _ReadingProgressHeader({
     required this.chapterNumber,
     required this.verseNumber,
-    required this.totalVerses,
     required this.progressValue,
     required this.isFocusMode,
     required this.onFocusToggle,
@@ -1011,7 +1107,6 @@ class _ReadingProgressHeader extends StatelessWidget {
 
   final int chapterNumber;
   final int verseNumber;
-  final int totalVerses;
   final double progressValue;
   final bool isFocusMode;
   final VoidCallback onFocusToggle;
@@ -1024,12 +1119,12 @@ class _ReadingProgressHeader extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Chapter $chapterNumber • Verse $verseNumber of $totalVerses',
+                'Chapter $chapterNumber • Verse $verseNumber',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: gitaBody(
                   color: kText.withValues(alpha: 0.86),
-                  size: 13,
+                  size: 14,
                   weight: FontWeight.w900,
                 ),
               ),
@@ -1054,6 +1149,24 @@ class _ReadingProgressHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ReadingSectionLabel extends StatelessWidget {
+  const _ReadingSectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: gitaBody(
+        color: kGold,
+        size: 12,
+        weight: FontWeight.w900,
+      ),
     );
   }
 }
@@ -1258,11 +1371,6 @@ class _ReflectionAndPracticePanels extends StatelessWidget {
           verse,
           matchedReflection,
         );
-        final canSave = _hasSourceReflectionOrPractice(
-          verse,
-          matchedReflection,
-        );
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1279,14 +1387,6 @@ class _ReflectionAndPracticePanels extends StatelessWidget {
                 fontSize: fontSize,
               ),
             ],
-            if (canSave) ...[
-              const SizedBox(height: 12),
-              _SaveReflectionButton(
-                verse: verse,
-                reflection: reflectionText,
-                practiceToday: practiceText,
-              ),
-            ],
           ],
         );
       },
@@ -1294,73 +1394,13 @@ class _ReflectionAndPracticePanels extends StatelessWidget {
   }
 }
 
-class _SaveReflectionButton extends StatefulWidget {
-  const _SaveReflectionButton({
-    required this.verse,
-    required this.reflection,
-    required this.practiceToday,
-  });
-
-  final GitaVerseData verse;
-  final String reflection;
-  final String practiceToday;
-
-  @override
-  State<_SaveReflectionButton> createState() => _SaveReflectionButtonState();
-}
-
-class _SaveReflectionButtonState extends State<_SaveReflectionButton> {
-  bool _isSaving = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: GoldButton(
-        label: 'Save Reflection',
-        icon: Icons.bookmark_add_rounded,
-        isLoading: _isSaving,
-        onPressed: _isSaving ? null : _saveReflection,
-      ),
-    );
-  }
-
-  Future<void> _saveReflection() async {
-    setState(() => _isSaving = true);
-    try {
-      await LocalStorageService.saveReflection(
-        widget.verse,
-        reflection: widget.reflection,
-        practiceToday: widget.practiceToday,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reflection saved')),
-        );
-      }
-    } catch (error, stackTrace) {
-      debugPrint('Save reflection failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save reflection.')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
-  }
-}
-
-class _MeaningPanel extends StatelessWidget {
-  const _MeaningPanel({
-    required this.meaning,
+class _GitaWisdomInterpretationPanel extends StatelessWidget {
+  const _GitaWisdomInterpretationPanel({
+    required this.interpretation,
     required this.fontSize,
   });
 
-  final String meaning;
+  final String interpretation;
   final double fontSize;
 
   @override
@@ -1368,17 +1408,16 @@ class _MeaningPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            kCream,
-            kAntiqueGold.withValues(alpha: 0.42),
-            kCream,
-          ],
-        ),
+        color: kCream,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: kGold.withValues(alpha: 0.22)),
+        border: Border.all(color: kGold.withValues(alpha: 0.34)),
+        boxShadow: [
+          BoxShadow(
+            color: kGold.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1389,17 +1428,17 @@ class _MeaningPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Meaning',
+                  'Gita Wisdom Interpretation',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: gitaBody(color: kDarkText, weight: FontWeight.w900),
+                  style: gitaBody(color: kGold, weight: FontWeight.w900),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 13),
           Text(
-            meaning,
+            interpretation,
             softWrap: true,
             style: gitaBody(color: kDarkText, size: 16.5 * fontSize).copyWith(
               height: 1.64,
@@ -1453,9 +1492,17 @@ class _ReflectionPanel extends StatelessWidget {
             reflection,
             style: gitaBody(
               color: kDarkText,
-              size: 15.5 * fontSize,
+              size: 16 * fontSize,
               weight: FontWeight.w700,
             ).copyWith(height: 1.58),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Carry one insight from this verse into your day.',
+            style: gitaTransliteration(
+              color: kRoyalPurple.withValues(alpha: 0.78),
+              size: 14 * fontSize,
+            ).copyWith(height: 1.45),
           ),
         ],
       ),
@@ -1512,7 +1559,7 @@ class _PracticeTodayPanel extends StatelessWidget {
             practiceToday,
             style: gitaBody(
               color: kDarkText,
-              size: 15.5 * fontSize,
+              size: 16 * fontSize,
               weight: FontWeight.w700,
             ).copyWith(height: 1.58),
           ),
@@ -1547,16 +1594,6 @@ String _effectivePracticeText(
   }
 
   return '';
-}
-
-bool _hasSourceReflectionOrPractice(
-  GitaVerseData verse,
-  VerseReflectionData? matchedReflection,
-) {
-  return verse.reflectionText.trim().isNotEmpty ||
-      verse.practiceToday.trim().isNotEmpty ||
-      (matchedReflection?.reflection.trim().isNotEmpty ?? false) ||
-      (matchedReflection?.practiceToday.trim().isNotEmpty ?? false);
 }
 
 String _verseAudioAssetPath(GitaVerseData verse) {
@@ -1805,11 +1842,10 @@ class _VerseBottomActions extends StatelessWidget {
     // so Save/Share/Highlight/Audio remain tied to the currently visible verse.
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       decoration: BoxDecoration(
-        color: kCard2.withValues(alpha: 0.08),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: kGold.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1828,17 +1864,17 @@ class _VerseBottomActions extends StatelessWidget {
                 label: 'Share',
                 onTap: onShare,
               ),
-              _HighlightActionChip(
-                verse: verse,
-                isHighlighting: isHighlightBusy,
-                onHighlightingChanged: onHighlightingChanged,
-              ),
               _VerseAudioControl(
                 verse: verse,
                 player: player,
                 selectedAudioVerseId: selectedAudioVerseId,
                 isAudioLoading: isAudioLoading,
                 onTap: onAudioToggle,
+              ),
+              _HighlightActionChip(
+                verse: verse,
+                isHighlighting: isHighlightBusy,
+                onHighlightingChanged: onHighlightingChanged,
               ),
             ],
           ),
@@ -2010,7 +2046,7 @@ class _SaveActionChip extends StatelessWidget {
         return _VerseActionChip(
           icon:
               isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-          label: isSaved ? 'Saved' : 'Save',
+          label: isSaved ? 'Saved Wisdom' : 'Save',
           selected: isSaved,
           isBusy: isSaving,
           onTap: () => _toggleSaved(context, isSaved),
@@ -2090,8 +2126,8 @@ class _VerseActionChip extends StatelessWidget {
       onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(100),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 38),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        constraints: const BoxConstraints(minHeight: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
         decoration: BoxDecoration(
           color: !enabled
               ? kCard2.withValues(alpha: 0.34)
@@ -2110,8 +2146,8 @@ class _VerseActionChip extends StatelessWidget {
           children: [
             if (isBusy)
               const SizedBox(
-                width: 16,
-                height: 16,
+                width: 15,
+                height: 15,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: kGold,
@@ -2125,11 +2161,11 @@ class _VerseActionChip extends StatelessWidget {
                     : selected
                         ? kSoftGold
                         : kText,
-                size: 16,
+                size: 15,
               ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 130),
+              constraints: const BoxConstraints(maxWidth: 112),
               child: Text(
                 label,
                 maxLines: 1,

@@ -4,11 +4,13 @@
 // links, about/disclaimer copy, and a local data reset. There are no account,
 // subscription, Firebase, or OpenAI settings in this offline build.
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../services/local_storage_service.dart';
 import '../../services/reading_progress_service.dart';
 import '../gita_common/gita_common.dart';
+import '../privacy_policy_page/privacy_policy_page_widget.dart';
+import '../support_page/support_page_widget.dart';
 
 class SettingsPageWidget extends StatefulWidget {
   const SettingsPageWidget({super.key});
@@ -40,40 +42,6 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 36),
             child: Column(
               children: [
-                AnimatedEntrance(
-                  child: PremiumCard(
-                    accent: true,
-                    child: Row(
-                      children: [
-                        const IconMedallion(
-                          icon: Icons.auto_stories_rounded,
-                          size: 56,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Gita Wisdom',
-                                style: gitaBody(
-                                  color: kText,
-                                  weight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Fully local MVP. No login or backend required.',
-                                style: gitaBody(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
                 // Reading preferences:
                 // These settings feed VerseReaderScreen and are kept local so
                 // reading remains available without an account.
@@ -93,37 +61,38 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                 ),
                 const SizedBox(height: 10),
                 AnimatedEntrance(
-                  delay: const Duration(milliseconds: 106),
+                  delay: const Duration(milliseconds: 96),
                   child: _SettingRow(
-                    icon: Icons.mail_outline_rounded,
-                    label: 'Send Feedback',
-                    value: 'Email',
+                    icon: Icons.privacy_tip_rounded,
+                    label: 'Privacy Policy',
+                    value: 'View',
                     valueColor: kSoftGold,
                     iconColor: kSoftGold,
-                    onTap: () => _openCommunityLink(
-                      Uri(
-                        scheme: 'mailto',
-                        path: 'pamidip@hotmail.com',
-                        queryParameters: {
-                          'subject': 'Gita Wisdom Feedback',
-                        },
-                      ),
+                    onTap: () => context.push(
+                      PrivacyPolicyPageWidget.routePath,
                     ),
                   ),
                 ),
                 AnimatedEntrance(
-                  delay: const Duration(milliseconds: 122),
+                  delay: const Duration(milliseconds: 102),
                   child: _SettingRow(
-                    icon: Icons.public_rounded,
-                    label: 'Project Source',
-                    value: 'GitHub',
+                    icon: Icons.support_agent_rounded,
+                    label: 'Support',
+                    value: 'Contact',
                     valueColor: kSoftGold,
                     iconColor: kSoftGold,
-                    onTap: () => _openCommunityLink(
-                      Uri.parse(
-                        'https://github.com/Sripadmaraj1997/gita-wisdom-app',
-                      ),
-                    ),
+                    onTap: () => context.push(SupportPageWidget.routePath),
+                  ),
+                ),
+                const AnimatedEntrance(
+                  delay: Duration(milliseconds: 106),
+                  child: _SettingRow(
+                    icon: Icons.people_outline_rounded,
+                    label: 'Community Links',
+                    value: 'None active',
+                    valueColor: kSoftGold,
+                    iconColor: kSoftGold,
+                    onTap: null,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -139,11 +108,6 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                   delay: Duration(milliseconds: 140),
                   child: _AboutCard(),
                 ),
-                const SizedBox(height: 12),
-                const AnimatedEntrance(
-                  delay: Duration(milliseconds: 175),
-                  child: _DisclaimerCard(),
-                ),
                 const SizedBox(height: 18),
                 // Local data clearing:
                 // Removes user-owned saved content and preferences from this
@@ -157,7 +121,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                   delay: const Duration(milliseconds: 210),
                   child: _SettingRow(
                     icon: Icons.delete_sweep_rounded,
-                    label: _isClearing ? 'Clearing...' : 'Clear Saved Data',
+                    label: _isClearing ? 'Clearing...' : 'Clear Local Data',
                     value: 'Local only',
                     valueColor: kSoftGold,
                     iconColor: kSoftGold,
@@ -179,9 +143,9 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: kCard,
-        title: Text('Clear saved data?', style: gitaTitle(22)),
+        title: Text('Clear local data?', style: gitaTitle(22)),
         content: Text(
-          'This removes saved verses, highlights, journal entries, journey progress, Ask Gita history, font size, theme setting, and continue reading progress from this device.',
+          'This removes saved verses, highlights, journal entries, journey progress, Ask Gita history, font size, and continue reading progress from this device only.',
           style: gitaBody(color: kText),
         ),
         actions: [
@@ -206,7 +170,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
       await ReadingProgressService.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Local saved data cleared.')),
+          const SnackBar(content: Text('Local data cleared.')),
         );
       }
     } catch (error, stackTrace) {
@@ -214,7 +178,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
       debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not clear saved data.')),
+          const SnackBar(content: Text('Local data was not cleared.')),
         );
       }
     } finally {
@@ -222,36 +186,6 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
         setState(() => _isClearing = false);
       }
     }
-  }
-
-  Future<void> _openCommunityLink(Uri uri) async {
-    try {
-      // Community links are optional conveniences. If the platform cannot open
-      // mail/browser intents, fail with a gentle snackbar instead of throwing.
-      final opened = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!opened && mounted) {
-        _showLinkError();
-      }
-    } catch (error, stackTrace) {
-      debugPrint('Community link open failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (mounted) {
-        _showLinkError();
-      }
-    }
-  }
-
-  void _showLinkError() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Could not open this link on this device.'),
-        ),
-      );
   }
 }
 
@@ -278,48 +212,13 @@ class _AboutCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Gita Wisdom is a peaceful Bhagavad Gita companion created to help bring timeless wisdom into daily life.\n\nMost core features are available offline, including reading, saved verses, journal, and reflections.\n\nTranslations and transliterations are loaded from the app\'s local Bhagavad Gita dataset. Reflections are practical study notes intended for daily contemplation.',
-                  style: gitaBody(color: kText, size: 13),
+                  'Gita Wisdom is a peaceful Bhagavad Gita companion created to help bring timeless wisdom into daily life.\n\nMost core features are available offline, including reading, saved verses, journal, journeys, and reflections.\n\nTranslations and transliterations are loaded from the app\'s local Bhagavad Gita dataset. Gita Wisdom Interpretation offers practical contemplative insights designed to help apply timeless teachings to everyday life. Reflections are practical study notes intended for daily contemplation.\n\nGita Wisdom supports spiritual learning. It is not medical, legal, financial, or mental health advice.',
+                  style: gitaBody(color: kText, size: 16).copyWith(
+                    height: 1.55,
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DisclaimerCard extends StatelessWidget {
-  const _DisclaimerCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return PremiumCard(
-      accent: true,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const IconMedallion(
-                icon: Icons.verified_user_rounded,
-                size: 44,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Disclaimer',
-                  style: gitaBody(color: kText, weight: FontWeight.w900),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Gita Wisdom provides Bhagavad Gita-inspired reflections for spiritual learning. It is not medical, legal, financial, or mental health advice.',
-            style: gitaBody(color: kText, size: 13),
           ),
         ],
       ),
@@ -608,8 +507,10 @@ class _SettingRow extends StatelessWidget {
                 weight: FontWeight.w800,
               ),
             ),
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded, color: kMuted),
+            if (onTap != null) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded, color: kMuted),
+            ],
           ],
         ),
       ),

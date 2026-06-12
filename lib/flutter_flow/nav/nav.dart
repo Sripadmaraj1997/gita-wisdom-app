@@ -2,8 +2,8 @@
 //
 // The app keeps FlutterFlow's generated navigation helpers, but the MVP route
 // graph is intentionally small and explicit. Main tabs use bottom navigation;
-// detail flows such as Verse Reader, Ask Gita, Saved, Journeys, and One
-// Minute Wisdom are pushed as focused screens.
+// detail flows such as Verse Reader, Ask Gita, Saved, and Journeys are pushed
+// as focused screens.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -78,6 +78,16 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           path: VerseReaderPageWidget.routePath,
           builder: (context, params) => VerseReaderPageWidget(
             verseId: params.getParam<String>('verseId', ParamType.String),
+            journeyId: params.getParam<String>('journeyId', ParamType.String),
+            journeyName:
+                params.getParam<String>('journeyName', ParamType.String),
+            journeyDay: params.getParam<int>('journeyDay', ParamType.int),
+            journeyTotalDays:
+                params.getParam<int>('journeyTotalDays', ParamType.int),
+            journeyDayTitle:
+                params.getParam<String>('journeyDayTitle', ParamType.String),
+            nextJourneyDayTitle: params.getParam<String>(
+                'nextJourneyDayTitle', ParamType.String),
           ),
         ),
         FFRoute(
@@ -109,14 +119,19 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => const SettingsPageWidget(),
         ),
         FFRoute(
+          name: PrivacyPolicyPageWidget.routeName,
+          path: PrivacyPolicyPageWidget.routePath,
+          builder: (context, params) => const PrivacyPolicyPageWidget(),
+        ),
+        FFRoute(
+          name: SupportPageWidget.routeName,
+          path: SupportPageWidget.routePath,
+          builder: (context, params) => const SupportPageWidget(),
+        ),
+        FFRoute(
           name: TransformationPageWidget.routeName,
           path: TransformationPageWidget.routePath,
           builder: (context, params) => const TransformationPageWidget(),
-        ),
-        FFRoute(
-          name: OneMinuteWisdomPageWidget.routeName,
-          path: OneMinuteWisdomPageWidget.routePath,
-          builder: (context, params) => const OneMinuteWisdomPageWidget(),
         ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

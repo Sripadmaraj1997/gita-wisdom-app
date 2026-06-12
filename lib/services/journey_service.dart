@@ -3,6 +3,8 @@
 // The detailed daily Journey content lives in the Journeys screen, while this
 // service exposes lightweight metadata for Home. Keeping the summary here lets
 // Home show "Current Journey" without importing screen-private widget models.
+import 'package:flutter/foundation.dart';
+
 import 'local_storage_service.dart';
 
 class GitaJourneySummary {
@@ -31,6 +33,9 @@ class GitaCurrentJourney {
   final int nextDay;
 
   int get completedCount => completedDays.length;
+  bool get isComplete => completedCount >= journey.totalDays;
+  String get progressLabel =>
+      '$completedCount of ${journey.totalDays} days complete';
 }
 
 class JourneyService {
@@ -69,16 +74,60 @@ class JourneyService {
     ),
   ];
 
+  static const recommendedAfterCompletionIds = [
+    'journey_discipline_14',
+    'journey_anxiety_7',
+    'journey_karma_yoga_14',
+    'journey_clarity_21',
+  ];
+
   static Future<GitaCurrentJourney> currentJourney() async {
     final progress = await LocalStorageService.journeyProgress();
-    return currentJourneyFromProgress(progress);
+    final selectedJourneyId = await LocalStorageService.currentJourneyId();
+    return currentJourneyFromProgress(
+      progress,
+      selectedJourneyId: selectedJourneyId,
+    );
+  }
+
+  static List<GitaJourneySummary> recommendedAfterCompletion() {
+    return [
+      for (final id in recommendedAfterCompletionIds)
+        journeys.firstWhere((journey) => journey.id == id),
+    ];
+  }
+
+  static List<GitaJourneySummary> completedJourneysFromProgress(
+    Map<String, Set<int>> progress,
+  ) {
+    return [
+      for (final journey in journeys)
+        if ((progress[journey.id] ?? <int>{}).length >= journey.totalDays)
+          journey,
+    ];
   }
 
   static GitaCurrentJourney currentJourneyFromProgress(
-    Map<String, Set<int>> progress,
-  ) {
+    Map<String, Set<int>> progress, {
+    String? selectedJourneyId,
+  }) {
+    if (selectedJourneyId != null) {
+      final selected = _journeyById(selectedJourneyId);
+      if (selected != null) {
+        final completed = progress[selected.id] ?? <int>{};
+        return GitaCurrentJourney(
+          journey: selected,
+          completedDays: completed,
+          nextDay: _nextDay(selected, completed),
+        );
+      }
+    }
+
     for (final journey in journeys) {
       final completed = progress[journey.id] ?? <int>{};
+      if (completed.length >= journey.totalDays) {
+        debugPrint('Journey completion detected: ${journey.id}');
+      }
       if (completed.isNotEmpty && completed.length < journey.totalDays) {
         return GitaCurrentJourney(
           journey: journey,
@@ -95,6 +144,15 @@ class JourneyService {
       completedDays: completed,
       nextDay: _nextDay(first, completed),
     );
+  }
+
+  static GitaJourneySummary? _journeyById(String id) {
+    for (final journey in journeys) {
+      if (journey.id == id) {
+        return journey;
+      }
+    }
+    return null;
   }
 
   static int _nextDay(GitaJourneySummary journey, Set<int> completedDays) {

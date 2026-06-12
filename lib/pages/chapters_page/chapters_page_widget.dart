@@ -133,7 +133,7 @@ class _ChaptersPageWidgetState extends State<ChaptersPageWidget> {
                       debugPrint('Chapters load failed: ${snapshot.error}');
                       return const ErrorStateCard(
                         message:
-                            'Could not load chapters from assets/data/gita/. Please check chapter1.json through chapter18.json and the pubspec asset entry.',
+                            'Chapters are not available right now. Please try again.',
                       );
                     }
                     final chapterList = snapshot.data ?? const [];
@@ -210,8 +210,7 @@ class _VerseSearchResults extends StatelessWidget {
         if (snapshot.hasError) {
           debugPrint('Chapter verse search failed: ${snapshot.error}');
           return const ErrorStateCard(
-            message:
-                'Could not search verses right now. Please check the Gita JSON files.',
+            message: 'Verse search is resting for a moment. Please try again.',
           );
         }
         final results = snapshot.data ?? const [];

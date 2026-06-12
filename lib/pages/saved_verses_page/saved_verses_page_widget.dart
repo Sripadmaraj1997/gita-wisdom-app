@@ -65,7 +65,7 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
         padding: const EdgeInsets.only(bottom: 42),
         children: [
           const PageHeader(
-            title: 'Saved & Highlights',
+            title: 'Saved Wisdom',
             subtitle: 'Private verses and reflections to return to',
             showBack: true,
             trailing: Icon(Icons.bookmark_rounded, color: kGold),
@@ -84,8 +84,8 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
                 if (snapshot.hasError) {
                   debugPrint('Saved verses load failed: ${snapshot.error}');
                   return const _SavedVersesEmptyState(
-                    title: 'Could not load saved wisdom.',
-                    body: 'Your local saved data could not be read.',
+                    title: 'Saved wisdom is resting for a moment.',
+                    body: 'Please return in a little while.',
                   );
                 }
 
@@ -96,7 +96,7 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
                   return const _SavedVersesEmptyState(
                     title: 'No saved wisdom yet.',
                     body:
-                        'Save verses and reflections that bring peace and clarity.',
+                        'Peace often begins with a single verse. Save wisdom you want to return to.',
                   );
                 }
 
@@ -167,7 +167,7 @@ class _SavedLibraryTabs extends StatelessWidget {
         children: [
           Expanded(
             child: _SavedLibraryTab(
-              label: 'Saved Verses',
+              label: 'Saved Wisdom',
               icon: Icons.bookmark_rounded,
               selected: selectedIndex == 0,
               onTap: () => onSelected(0),
@@ -176,7 +176,7 @@ class _SavedLibraryTabs extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _SavedLibraryTab(
-              label: 'Saved Reflections',
+              label: 'Reflections',
               icon: Icons.lightbulb_outline_rounded,
               selected: selectedIndex == 1,
               onTap: () => onSelected(1),
@@ -258,7 +258,7 @@ class _SavedVersesList extends StatelessWidget {
     if (saved.isEmpty && highlighted.isEmpty) {
       return const _SavedVersesEmptyState(
         title: 'No saved verses yet.',
-        body: 'Save wisdom that speaks to your heart.',
+        body: 'Begin with one verse that steadies your heart.',
       );
     }
 
@@ -285,7 +285,7 @@ class _SavedVersesList extends StatelessWidget {
         if (saved.isNotEmpty) ...[
           const _SavedSectionHeader(
             icon: Icons.bookmark_rounded,
-            title: 'Saved Verses',
+            title: 'Saved Wisdom',
           ),
           const SizedBox(height: 18),
           for (var i = 0; i < saved.length; i++) ...[
@@ -318,7 +318,7 @@ class _SavedReflectionsList extends StatelessWidget {
     if (reflections.isEmpty) {
       return const _SavedVersesEmptyState(
         title: 'No saved reflections yet.',
-        body: 'Save reflections that bring peace and clarity.',
+        body: 'Begin your reflection journey with one note worth carrying.',
       );
     }
 
@@ -415,7 +415,7 @@ class _HighlightedVerseCard extends StatelessWidget {
               verse.englishTranslation,
               style: gitaBody(
                 color: kDarkText,
-                size: 15,
+                size: 16,
                 weight: FontWeight.w800,
               ).copyWith(height: 1.5),
             ),
@@ -502,7 +502,7 @@ class _SavedVerseCard extends StatelessWidget {
             ),
             child: Text(
               verse.translation,
-              style: gitaBody(color: kDarkText, size: 15),
+              style: gitaBody(color: kDarkText, size: 16),
             ),
           ),
           const SizedBox(height: 14),

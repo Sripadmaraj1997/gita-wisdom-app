@@ -407,6 +407,9 @@ class LocalStorageService {
   static const askHistoryKey = 'gita_ask_history';
   static const recentVersesKey = 'gita_recent_verses';
   static const journeyProgressKey = 'gita_reading_plan_progress';
+  static const completedJourneysKey = 'gita_completed_journeys';
+  static const currentJourneyKey = 'gita_current_journey';
+  static const currentJourneyDayKey = 'gita_current_journey_day';
   static const readerFontScaleKey = 'gita_reader_font_scale';
   static const readerShowSanskritKey = 'gita_reader_show_sanskrit';
   static const readerShowTransliterationKey =
@@ -414,6 +417,9 @@ class LocalStorageService {
   static const completedPracticeDatesKey = 'gita_completed_practice_dates';
   static const recentReflectionsKey = 'gita_recent_reflections';
   static const themeModeKey = 'gita_theme_mode';
+
+  static final ValueNotifier<int> journeyProgressRevision =
+      ValueNotifier<int>(0);
 
   // Saved/highlight storage:
   // Saved verses store compact snapshots for fast rendering. Highlights store
@@ -561,7 +567,8 @@ class LocalStorageService {
 
   static Future<List<LocalJournalEntry>> journalEntries() async {
     // Journal notes are user-authored local data. They are intentionally kept
-    // separate from scripture, translation, meaning, and reflection datasets.
+    // separate from scripture, translation, Gita Wisdom Interpretation, and
+    // reflection datasets.
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(journalEntriesKey);
@@ -817,12 +824,15 @@ class LocalStorageService {
     await prefs.remove(askHistoryKey);
     await prefs.remove(recentVersesKey);
     await prefs.remove(journeyProgressKey);
+    await prefs.remove(completedJourneysKey);
     await prefs.remove(readerFontScaleKey);
     await prefs.remove(readerShowSanskritKey);
     await prefs.remove(readerShowTransliterationKey);
     await prefs.remove(completedPracticeDatesKey);
     await prefs.remove(recentReflectionsKey);
     await prefs.remove(themeModeKey);
+    debugPrint('Journey progress saved: cleared');
+    journeyProgressRevision.value += 1;
   }
 
   static Future<double> readerFontScale() async {
@@ -918,18 +928,25 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(journeyProgressKey);
       if (raw == null || raw.isEmpty) {
+        debugPrint('Journey progress loaded: empty');
         return <String, Set<int>>{};
       }
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
+        debugPrint('Journey progress loaded: invalid payload');
         return <String, Set<int>>{};
       }
-      return decoded.map((key, value) {
+      final progress = decoded.map((key, value) {
         final days = value is List
             ? value.map(_readInt).where((day) => day > 0).toSet()
             : <int>{};
         return MapEntry(key, days);
       });
+      debugPrint(
+        'Journey progress loaded: '
+        '${progress.map((key, value) => MapEntry(key, value.toList()..sort()))}',
+      );
+      return progress;
     } catch (error, stackTrace) {
       debugPrint('Journey progress load failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -950,10 +967,121 @@ class LocalStorageService {
     return completedReadingPlanDays(journeyId);
   }
 
+  static Future<Set<String>> completedJourneyIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = (prefs.getStringList(completedJourneysKey) ?? const [])
+          .where((id) => id.trim().isNotEmpty)
+          .toSet();
+      debugPrint('Completed journeys loaded: ${ids.toList()..sort()}');
+      return ids;
+    } catch (error, stackTrace) {
+      debugPrint('Completed journeys load failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return <String>{};
+    }
+  }
+
+  static Future<String?> currentJourneyId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = prefs.getString(currentJourneyKey)?.trim();
+      debugPrint(
+          'Current journey loaded: ${id?.isEmpty ?? true ? 'none' : id}');
+      return id == null || id.isEmpty ? null : id;
+    } catch (error, stackTrace) {
+      debugPrint('Current journey load failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return null;
+    }
+  }
+
+  static Future<void> setCurrentJourneyId(String journeyId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(currentJourneyKey, journeyId);
+      debugPrint('Current journey saved: $journeyId');
+      journeyProgressRevision.value += 1;
+    } catch (error, stackTrace) {
+      debugPrint('Current journey save failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  static Future<int> currentJourneyDay() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final day = prefs.getInt(currentJourneyDayKey) ?? 1;
+      return day < 1 ? 1 : day;
+    } catch (error, stackTrace) {
+      debugPrint('Current journey day load failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return 1;
+    }
+  }
+
+  static Future<void> setCurrentJourneyDay({
+    required String journeyId,
+    required int day,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(currentJourneyKey, journeyId);
+      await prefs.setInt(currentJourneyDayKey, day < 1 ? 1 : day);
+      debugPrint('Current journey saved: $journeyId');
+      debugPrint('Current journey day saved: ${day < 1 ? 1 : day}');
+      journeyProgressRevision.value += 1;
+    } catch (error, stackTrace) {
+      debugPrint('Current journey day save failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  static Future<void> startJourney(String journeyId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final progress = await readingPlanProgress();
+      progress.remove(journeyId);
+      final json = progress.map(
+        (key, value) => MapEntry(key, value.toList()..sort()),
+      );
+      await prefs.setString(journeyProgressKey, jsonEncode(json));
+      await prefs.setString(currentJourneyKey, journeyId);
+      await prefs.setInt(currentJourneyDayKey, 1);
+      debugPrint('Current journey saved: $journeyId');
+      debugPrint('Current journey day saved: 1');
+      debugPrint('Journey progress reset for: $journeyId');
+      journeyProgressRevision.value += 1;
+    } catch (error, stackTrace) {
+      debugPrint('Journey start save failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  static Future<void> markJourneyCompleted(String journeyId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = await completedJourneyIds();
+      ids.add(journeyId);
+      final sortedIds = ids.toList()..sort();
+      await prefs.setStringList(completedJourneysKey, sortedIds);
+      debugPrint('Journey completion saved: $journeyId');
+      journeyProgressRevision.value += 1;
+    } catch (error, stackTrace) {
+      debugPrint('Journey completion save failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
   static Future<void> setReadingPlanDayComplete({
     required String planId,
     required int day,
     required bool complete,
+    int? totalDays,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -969,6 +1097,20 @@ class LocalStorageService {
         (key, value) => MapEntry(key, value.toList()..sort()),
       );
       await prefs.setString(journeyProgressKey, jsonEncode(json));
+      debugPrint('Journey progress saved: $json');
+      if (totalDays != null) {
+        final completedIds = await completedJourneyIds();
+        if (complete && completedDays.length >= totalDays) {
+          completedIds.add(planId);
+          debugPrint('Journey completion saved: $planId');
+        } else {
+          completedIds.remove(planId);
+          debugPrint('Journey completion saved: removed $planId');
+        }
+        final sortedIds = completedIds.toList()..sort();
+        await prefs.setStringList(completedJourneysKey, sortedIds);
+      }
+      journeyProgressRevision.value += 1;
     } catch (error, stackTrace) {
       debugPrint('Journey progress save failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -980,11 +1122,13 @@ class LocalStorageService {
     required String journeyId,
     required int day,
     required bool complete,
+    int? totalDays,
   }) {
     return setReadingPlanDayComplete(
       planId: journeyId,
       day: day,
       complete: complete,
+      totalDays: totalDays,
     );
   }
 

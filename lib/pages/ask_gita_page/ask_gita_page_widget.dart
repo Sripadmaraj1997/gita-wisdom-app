@@ -108,7 +108,7 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
       }
       setState(() {
         _emptyMessage =
-            'Try asking about peace, duty, fear, anger, attachment, or purpose.';
+            'Begin with what you are carrying. A verse and one small practice can help steady the next step.';
         _isLoading = false;
       });
       _scrollGentlyToAnswer();
@@ -471,7 +471,7 @@ class _QuestionComposer extends StatelessWidget {
                   minLines: 1,
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
-                  style: gitaBody(color: kDarkText, size: 15),
+                  style: gitaBody(color: kDarkText, size: 16),
                   onSubmitted: (_) => onSubmit(),
                   decoration: InputDecoration(
                     hintText: 'Ask about peace, duty, fear, purpose...',
@@ -555,9 +555,9 @@ class _QuietStartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return const EmptyStateCard(
       icon: Icons.menu_book_rounded,
-      title: 'Seek clarity, peace, and wisdom through the Gita.',
+      title: 'Bring one honest question.',
       body:
-          'Ask about worry, anger, discipline, attachment, or purpose to receive a verse and one small practice.',
+          'Share what you are carrying. Ask Gita will offer a verse, calm guidance, and one small practice.',
     );
   }
 }
@@ -579,7 +579,7 @@ class _EmptyAskState extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: gitaBody(color: kText, size: 15).copyWith(height: 1.5),
+              style: gitaBody(color: kText, size: 16).copyWith(height: 1.5),
             ),
           ),
         ],
@@ -632,21 +632,34 @@ class _GuidanceResultCard extends StatelessWidget {
             const SizedBox(height: 20),
             _GuidanceSection(
               icon: Icons.lightbulb_outline_rounded,
-              title: 'Meaning',
+              title: 'Gita Wisdom Interpretation',
               child: Text(
                 guidance.meaning,
                 style:
-                    gitaBody(color: kDarkText, size: 15).copyWith(height: 1.6),
+                    gitaBody(color: kDarkText, size: 16).copyWith(height: 1.6),
               ),
             ),
             const SizedBox(height: 20),
             _GuidanceSection(
               icon: Icons.favorite_border_rounded,
               title: 'Reflection',
-              child: Text(
-                guidance.reflection,
-                style:
-                    gitaBody(color: kDarkText, size: 15).copyWith(height: 1.6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    guidance.reflection,
+                    style: gitaBody(color: kDarkText, size: 16)
+                        .copyWith(height: 1.6),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'What is one thing you will remember from this today?',
+                    style: gitaTransliteration(
+                      color: kRoyalPurple.withValues(alpha: 0.78),
+                      size: 14,
+                    ).copyWith(height: 1.45),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -657,7 +670,7 @@ class _GuidanceResultCard extends StatelessWidget {
                 guidance.practiceToday,
                 style: gitaBody(
                   color: kDarkText,
-                  size: 15,
+                  size: 16,
                   weight: FontWeight.w800,
                 ).copyWith(height: 1.58),
               ),
