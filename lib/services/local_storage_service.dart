@@ -400,24 +400,43 @@ class LocalStorageService {
   // If cloud sync is added later, these keys define the local cache contract.
   // TODO(cloud-sync): Move these calls behind a sync repository if accounts are
   // introduced, while preserving these keys for local-first migration.
+  //
+  // User-owned collections:
+  // These values represent private device-local activity. Saved verses keep a
+  // small snapshot for fast display, while highlights keep verse IDs so the
+  // latest local Gita JSON remains the source of scripture text.
   static const savedVersesKey = 'gita_saved_verses';
   static const savedReflectionsKey = 'gita_saved_reflections';
   static const highlightedVersesKey = 'gita_highlighted_verses';
   static const journalEntriesKey = 'gita_journal_entries';
   static const askHistoryKey = 'gita_ask_history';
   static const recentVersesKey = 'gita_recent_verses';
+
+  // Journey continuity:
+  // The progress key keeps its original "reading_plan" value for migration
+  // safety, but all user-facing copy now calls the feature Journeys.
   static const journeyProgressKey = 'gita_reading_plan_progress';
   static const completedJourneysKey = 'gita_completed_journeys';
   static const currentJourneyKey = 'gita_current_journey';
   static const currentJourneyDayKey = 'gita_current_journey_day';
+
+  // Reader preferences:
+  // These are intentionally simple scalar preferences so Verse Reader can
+  // restore typography and Sanskrit/transliteration visibility instantly.
   static const readerFontScaleKey = 'gita_reader_font_scale';
   static const readerShowSanskritKey = 'gita_reader_show_sanskrit';
   static const readerShowTransliterationKey =
       'gita_reader_show_transliteration';
+
+  // Daily reflection memory:
+  // These keys drive the gentle "Days of Reflection" and recent activity
+  // surfaces without requiring accounts, tracking, or remote analytics.
   static const completedPracticeDatesKey = 'gita_completed_practice_dates';
   static const recentReflectionsKey = 'gita_recent_reflections';
   static const themeModeKey = 'gita_theme_mode';
 
+  // Screens listen to this notifier to refresh journey cards immediately after
+  // progress changes, instead of waiting for a full route rebuild or app restart.
   static final ValueNotifier<int> journeyProgressRevision =
       ValueNotifier<int>(0);
 

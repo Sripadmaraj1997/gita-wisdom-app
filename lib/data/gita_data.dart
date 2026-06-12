@@ -899,7 +899,7 @@ class GitaRepository {
       // 3. reflection / practice text
       // 4. translation and Gita Wisdom Interpretation (stored as meaning)
       // 5. transliteration / Sanskrit matches
-      var score = 0;
+      var rankingScore = 0;
       final exactReferenceMatch = normalizedQuery == verse.id ||
           normalizedQuery == '${verse.chapterNumber}.${verse.verseNumber}' ||
           normalizedQuery == '${verse.chapterNumber}:${verse.verseNumber}' ||
@@ -907,79 +907,79 @@ class GitaRepository {
               '${verse.chapterNumber} ${verse.verseNumber}'.trim() ||
           referenceText.contains(' $normalizedQuery ');
       if (exactReferenceMatch) {
-        score += 100;
+        rankingScore += 100;
       } else if (referenceText.contains(normalizedQuery) ||
           numberText.contains(normalizedQuery)) {
-        score += 70;
+        rankingScore += 70;
       }
       if (tagText.contains(normalizedQuery)) {
-        score += 55;
+        rankingScore += 55;
       }
       if (reflectionText.contains(normalizedQuery) ||
           practiceText.contains(normalizedQuery)) {
-        score += 42;
+        rankingScore += 42;
       }
       if (translationText.contains(normalizedQuery)) {
-        score += 30;
+        rankingScore += 30;
       }
       if (originalTerms.isNotEmpty &&
           originalTerms.every(translationText.contains)) {
-        score += 40;
+        rankingScore += 40;
       } else if (originalTerms.isNotEmpty &&
           originalTerms.every(
             (term) =>
                 translationText.contains(term) || meaningText.contains(term),
           )) {
-        score += 25;
+        rankingScore += 25;
       }
       if (meaningText.contains(normalizedQuery)) {
-        score += 24;
+        rankingScore += 24;
       }
       if (transliterationText.contains(normalizedQuery)) {
-        score += 18;
+        rankingScore += 18;
       }
       if (sanskritText.contains(normalizedQuery)) {
-        score += 16;
+        rankingScore += 16;
       }
       for (final term in terms) {
         if (tagText.contains(term)) {
-          score += 12;
+          rankingScore += 12;
         }
         if (reflectionText.contains(term)) {
-          score += 9;
+          rankingScore += 9;
         }
         if (practiceText.contains(term)) {
-          score += 8;
+          rankingScore += 8;
         }
         if (translationText.contains(term)) {
-          score += 7;
+          rankingScore += 7;
         }
         if (meaningText.contains(term)) {
-          score += 5;
+          rankingScore += 5;
         }
         if (transliterationText.contains(term)) {
-          score += 4;
+          rankingScore += 4;
         }
         if (sanskritText.contains(term)) {
-          score += 4;
+          rankingScore += 4;
         }
         if (referenceText.contains(term) || numberText.contains(term)) {
-          score += 3;
+          rankingScore += 3;
         }
         if (chapterText.contains(term)) {
-          score += 2;
+          rankingScore += 2;
         }
       }
       if (terms.every(translationText.contains)) {
-        score += 8;
+        rankingScore += 8;
       } else if (terms.every(text.contains)) {
-        score += 3;
+        rankingScore += 3;
       }
-      if (score > 0) {
+      if (rankingScore > 0) {
         results.add(GitaSearchResult(
           verse: verse,
           chapter: chapter,
-          score: score,
+          score: rankingScore,
         ));
       }
     }

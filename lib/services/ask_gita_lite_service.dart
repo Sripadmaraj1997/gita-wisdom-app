@@ -11,6 +11,9 @@ import '../data/gita_data.dart';
 import 'content_quality_framework.dart';
 
 class AskGitaLiteAnswer {
+  // The UI renders these fields in order as the required six-part response:
+  // Gentle Guidance, Relevant Verse, Meaning, Reflection, Practice Today,
+  // and Source. Keeping the structure explicit avoids free-form chatbot copy.
   const AskGitaLiteAnswer({
     required this.topic,
     required this.gentleGuidance,

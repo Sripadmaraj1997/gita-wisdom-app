@@ -690,6 +690,11 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     Map<String, Set<int>> progress, {
     String? selectedJourneyId,
   }) {
+    // Journey state priority:
+    // 1. explicit route entry from Home/selection
+    // 2. persisted current journey
+    // 3. any in-progress journey
+    // 4. the first bundled journey as a calm default for first launch
     final initialJourneyId = widget.initialJourneyId;
     if (initialJourneyId != null) {
       for (final journey in _journeys) {
@@ -715,6 +720,8 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
   }
 
   List<_Journey> _completedJourneys(Map<String, Set<int>> progress) {
+    // Completion is derived from completed day counts so old installs do not
+    // depend on a separate completion flag being perfectly in sync.
     return [
       for (final journey in _journeys)
         if ((progress[journey.id] ?? <int>{}).length >= journey.days.length)
@@ -739,6 +746,8 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
   }
 
   _JourneyDay _nextJourneyDay(_Journey journey, Set<int> completedDays) {
+    // Continue Journey always targets the earliest incomplete day. This keeps
+    // the path guided and avoids dropping users into a random chapter reader.
     for (final day in journey.days) {
       if (!completedDays.contains(day.day)) {
         return day;
@@ -753,6 +762,8 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     int? storedDay,
     Set<int> completedDays,
   ) {
+    // A stored day keeps the user's place stable across app restarts. If that
+    // day is already complete, fall back to the next incomplete day.
     if (storedDay == null) {
       return fallback;
     }
@@ -834,6 +845,8 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     bool closeSheet = true,
   }) async {
     debugPrint('selected journey id ${journey.id}');
+    // Starting a new Journey resets only that Journey's active day. Previously
+    // completed Journeys remain complete so Home can show meaningful continuity.
     await LocalStorageService.startJourney(journey.id);
     debugPrint('navigation target JourneyDay ${journey.id} day 1');
     if (!mounted || !sheetContext.mounted) {
@@ -921,6 +934,8 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     _JourneyDay day, {
     bool scrollToTop = false,
   }) async {
+    // Selecting a day updates the persisted current Journey/day before the UI
+    // refreshes, so Home and Verse Reader receive the same navigation context.
     await LocalStorageService.setCurrentJourneyDay(
       journeyId: journey.id,
       day: day.day,
@@ -979,6 +994,8 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
   }
 
   void _openJourneyVerse(_Journey journey, _JourneyDay day) {
+    // Verse Reader receives compact Journey context through query parameters.
+    // That keeps scripture first while still giving users a clear way back.
     final nextDay = day.day < journey.days.length
         ? journey.days[day.day]
         : journey.days.last;

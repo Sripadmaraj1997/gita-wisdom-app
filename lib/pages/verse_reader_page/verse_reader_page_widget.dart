@@ -463,10 +463,10 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
     }
 
     final player = _audioPlayer();
-    final isCurrentVerse = _selectedAudioVerseId == verse.id;
+    final isSameAudioVerse = _selectedAudioVerseId == verse.id;
     final state = player.playerState.processingState;
 
-    if (isCurrentVerse && player.playing) {
+    if (isSameAudioVerse && player.playing) {
       // Pause must remain responsive even while the progress stream is active.
       debugPrint('VerseAudio: pause tapped ${verse.reference}');
       HapticFeedback.selectionClick();
@@ -477,7 +477,9 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
       return;
     }
 
-    if (isCurrentVerse && !player.playing && !_isAudioLoading) {
+    if (isSameAudioVerse && !player.playing && !_isAudioLoading) {
+      // Replaying the same verse should never rebuild the reading layout or
+      // reload the asset; seek to the beginning only after a completed play.
       if (state == ProcessingState.completed) {
         await player.seek(Duration.zero);
       }
