@@ -1,13 +1,36 @@
-// Premium scripture reader.
-//
-// Shows one verse at a time with Sanskrit, transliteration, translation,
-// interpretation, reflection, and Practice Today. The top verse content remains
-// immediately visible, while long explanations scroll below. Previous/Next
-// controls stay fixed at the bottom. Verse audio is lazy-loaded only after the
-// user taps Play so app startup and chapter navigation never wait on audio.
-//
-// TODO(licensed-full-audio): When licensed recitations are ready, keep the
-// lazy-load behavior and expand the asset pack with this file convention.
+/// ------------------------------------------------------------
+/// VerseReaderScreen
+///
+/// Purpose:
+/// Premium scripture reader for one Bhagavad Gita verse at a time.
+///
+/// Responsibilities:
+/// - Load a verse from local JSON by verseId or chapter query parameters.
+/// - Present content in the devotional reading order:
+///   Sanskrit -> Transliteration -> Translation -> Gita Wisdom Interpretation
+///   -> Reflection -> Practice Today.
+/// - Keep Save, Share, Play/Pause, Highlight, Previous, and Next secondary to
+///   the verse itself.
+/// - Preserve Journey context with a compact Back to Journey row when opened
+///   from a guided path.
+/// - Record Continue Reading and local reflection activity.
+///
+/// Data sources:
+/// - GitaRepository for Sanskrit, transliteration, translation, and reviewed
+///   interpretation/reflection/practice content.
+/// - ReflectionService for optional verse-level reflection overrides.
+/// - LocalStorageService and ReadingProgressService for saved state.
+///
+/// Notes:
+/// Reading experience is prioritized over controls. Audio is lazy-loaded only
+/// after the user taps Play; missing audio is handled silently because audio
+/// should enhance reading, never block it.
+///
+/// TODO(full-audio-library): When licensed recitations are ready, keep lazy
+/// loading and expand the asset pack with the existing chapter_verse convention.
+/// ------------------------------------------------------------
+library;
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -18,9 +41,17 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../data/gita_data.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/personalization_service.dart';
 import '../../services/reading_progress_service.dart';
 import '../../services/reflection_service.dart';
 import '../gita_common/gita_common.dart';
+
+void _readerDebugLog(String message) {
+  assert(() {
+    debugPrint(message);
+    return true;
+  }());
+}
 
 class VerseReaderPageWidget extends StatefulWidget {
   const VerseReaderPageWidget({
@@ -444,7 +475,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
     // spinner/play/pause from this stream so loading cannot get stuck.
     _verseAudioPlayerStateSubscription = player.playerStateStream.listen(
       (state) {
-        debugPrint(
+        _readerDebugLog(
           'VerseAudio: playerState changed playing=${state.playing}, processing=${state.processingState.name}',
         );
         if (state.processingState == ProcessingState.completed && mounted) {
@@ -468,7 +499,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
 
     if (isSameAudioVerse && player.playing) {
       // Pause must remain responsive even while the progress stream is active.
-      debugPrint('VerseAudio: pause tapped ${verse.reference}');
+      _readerDebugLog('VerseAudio: pause tapped ${verse.reference}');
       HapticFeedback.selectionClick();
       await player.pause();
       if (mounted) {
@@ -483,7 +514,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
       if (state == ProcessingState.completed) {
         await player.seek(Duration.zero);
       }
-      debugPrint('VerseAudio: play start ${verse.reference}');
+      _readerDebugLog('VerseAudio: play start ${verse.reference}');
       HapticFeedback.selectionClick();
       unawaited(player.play());
       if (mounted) {
@@ -492,7 +523,7 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
       return;
     }
 
-    debugPrint('VerseAudio: loading start $assetPath');
+    _readerDebugLog('VerseAudio: loading start $assetPath');
     HapticFeedback.selectionClick();
     setState(() {
       _selectedAudioVerseId = verse.id;
@@ -505,11 +536,11 @@ class _VerseReaderPageWidgetState extends State<VerseReaderPageWidget> {
       // instead of crashing or blocking scripture reading.
       await player.stop();
       await player.setAsset(assetPath);
-      debugPrint('VerseAudio: setAsset complete $assetPath');
+      _readerDebugLog('VerseAudio: setAsset complete $assetPath');
       if (mounted) {
         setState(() => _isAudioLoading = false);
       }
-      debugPrint('VerseAudio: play start ${verse.reference}');
+      _readerDebugLog('VerseAudio: play start ${verse.reference}');
       unawaited(
         player.play().catchError((Object error, StackTrace stackTrace) {
           debugPrint('VerseAudio: play failed for $assetPath: $error');
@@ -2003,6 +2034,9 @@ class _HighlightActionChip extends StatelessWidget {
         verse.id,
         highlighted: !highlighted,
       );
+      if (!highlighted) {
+        await PersonalizationService.recordVerseHighlighted(verse);
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

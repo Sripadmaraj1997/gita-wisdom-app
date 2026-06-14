@@ -1,11 +1,28 @@
-// Ask Gita Lite screen.
-//
-// This is a retrieval-only MVP: it searches local Gita verses and local journal
-// reflections, then formats calm guidance. It intentionally does not call
-// OpenAI, Firebase, or any backend so it remains fast and available offline.
-//
-// A future backend guidance layer should reuse the six-part response contract,
-// with retrieved verses/reflections as context and local retrieval as fallback.
+/// ------------------------------------------------------------
+/// AskGitaScreen
+///
+/// Purpose:
+/// Local, retrieval-based spiritual guidance screen.
+///
+/// Responsibilities:
+/// - Accept suggested or typed user questions.
+/// - Render the required answer structure: Guidance, Verse, Meaning,
+///   Reflection, Practice Today, and Source.
+/// - Save completed guidance locally for continuity.
+/// - Keep the experience calm and practical rather than conversationally noisy.
+///
+/// Data sources:
+/// - AskGitaLiteService for deterministic local guidance.
+/// - GitaRepository for verified local verse translations.
+/// - LocalStorageService for private local history.
+///
+/// Notes:
+/// The goal is practical wisdom, not chatbot conversation. This screen avoids
+/// OpenAI, Firebase, and backend calls so guidance remains private, reviewable,
+/// and available offline.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 

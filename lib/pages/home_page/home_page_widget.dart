@@ -1,17 +1,45 @@
-// Home screen for the daily spiritual companion experience.
-//
-// This page intentionally prioritizes a calm daily flow over dashboard density:
-// arrive, resume reading, choose Read/Ask, receive Today's Guidance, revisit a
-// verse, then use secondary tools. All state is local.
+/// ------------------------------------------------------------
+/// HomeScreen
+///
+/// Purpose:
+/// Main companion entry point after splash.
+///
+/// Responsibilities:
+/// - Continue Reading from the last opened verse.
+/// - Surface Today's Guidance and a practical daily action.
+/// - Route users into Read Gita, Ask Gita, Journeys, Search, Journal, and Saved
+///   Wisdom without creating dashboard clutter.
+/// - Show local continuity such as Current Journey, Recently Reflected On, and
+///   Days of Reflection.
+///
+/// Data sources:
+/// - ReadingProgressService for Continue Reading.
+/// - DailyCompanionService and PersonalizationService for Today's Guidance.
+/// - LocalStorageService/JourneyService for local journey state.
+///
+/// Notes:
+/// Home follows a companion-first design. The screen should answer one question
+/// quickly: "What is the next sincere step I can take today?"
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/gita_data.dart';
 import '../../services/daily_companion_service.dart';
 import '../../services/journey_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/personalization_service.dart';
 import '../../services/reading_progress_service.dart';
 import '../gita_common/gita_common.dart';
 import '../transformation_page/transformation_page_widget.dart';
+
+void _homeDebugLog(String message) {
+  assert(() {
+    debugPrint(message);
+    return true;
+  }());
+}
 
 class HomePageWidget extends StatelessWidget {
   const HomePageWidget({super.key});
@@ -97,14 +125,21 @@ class HomePageWidget extends StatelessWidget {
                 // reference, one reflection, and one practice.
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 80),
-                  child: _TodaysGuidanceCard(
-                    guidance: DailyCompanionService.todaysGuidance(),
-                    onReadVerse: (guidance) {
-                      _recordReflectedVerse(guidance.verseId);
-                      context.push(Uri(
-                        path: '/verseReaderPage',
-                        queryParameters: {'verseId': guidance.verseId},
-                      ).toString());
+                  child: FutureBuilder<DailyGuidance>(
+                    future: PersonalizationService.personalizedTodaysGuidance(),
+                    builder: (context, snapshot) {
+                      final guidance = snapshot.data ??
+                          DailyCompanionService.todaysGuidance();
+                      return _TodaysGuidanceCard(
+                        guidance: guidance,
+                        onReadVerse: (guidance) {
+                          _recordReflectedVerse(guidance.verseId);
+                          context.push(Uri(
+                            path: '/verseReaderPage',
+                            queryParameters: {'verseId': guidance.verseId},
+                          ).toString());
+                        },
+                      );
                     },
                   ),
                 ),
@@ -143,6 +178,25 @@ class HomePageWidget extends StatelessWidget {
                           ),
                         );
                       },
+                    );
+                  },
+                ),
+                _PersonalizedRecommendationSection(
+                  onOpenVerse: (verseId) => context.push(Uri(
+                    path: '/verseReaderPage',
+                    queryParameters: {'verseId': verseId},
+                  ).toString()),
+                  onOpenJourney: (journeyId) async {
+                    await LocalStorageService.startJourney(journeyId);
+                    if (!context.mounted) {
+                      return;
+                    }
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => TransformationPageWidget(
+                          initialJourneyId: journeyId,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -566,6 +620,119 @@ class _GoldHighlightLabel extends StatelessWidget {
   }
 }
 
+class _PersonalizedRecommendationSection extends StatelessWidget {
+  const _PersonalizedRecommendationSection({
+    required this.onOpenVerse,
+    required this.onOpenJourney,
+  });
+
+  final ValueChanged<String> onOpenVerse;
+  final Future<void> Function(String journeyId) onOpenJourney;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<PersonalizedRecommendation>>(
+      future: PersonalizationService.recommendations(limit: 1),
+      builder: (context, snapshot) {
+        final recommendations = snapshot.data ?? const [];
+        if (snapshot.connectionState != ConnectionState.done ||
+            recommendations.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final item = recommendations.first;
+        return AnimatedEntrance(
+          delay: const Duration(milliseconds: 116),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionHeader(title: 'Recommended For You'),
+                const SizedBox(height: 12),
+                PressableScale(
+                  onTap: () {
+                    final verseId = item.verseId;
+                    if (verseId != null) {
+                      onOpenVerse(verseId);
+                      return;
+                    }
+                    final journeyId = item.journeyId;
+                    if (journeyId != null) {
+                      onOpenJourney(journeyId);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(22),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: kCard2.withValues(alpha: 0.74),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: kGold.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        IconMedallion(
+                          icon: item.opensJourney
+                              ? Icons.route_rounded
+                              : Icons.auto_stories_rounded,
+                          size: 42,
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.reason,
+                                style: gitaBody(
+                                  color: kSoftGold,
+                                  size: 12,
+                                  weight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                item.title,
+                                style: gitaBody(
+                                  color: kText,
+                                  size: 17,
+                                  weight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                item.subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: gitaBody(
+                                  color: kMuted,
+                                  size: 13,
+                                  weight: FontWeight.w700,
+                                ).copyWith(height: 1.35),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: kGold,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ReflectionAction extends StatelessWidget {
   const _ReflectionAction({
     required this.icon,
@@ -720,22 +887,22 @@ class _ReflectedChip extends StatelessWidget {
 }
 
 Future<void> _continueJourneyFromHome(BuildContext context) async {
-  debugPrint('continueJourney tapped');
+  _homeDebugLog('continueJourney tapped');
   final currentJourneyId = await LocalStorageService.currentJourneyId();
-  debugPrint('currentJourneyId value: ${currentJourneyId ?? 'none'}');
+  _homeDebugLog('currentJourneyId value: ${currentJourneyId ?? 'none'}');
 
   var journeyId = currentJourneyId;
   if (journeyId == null || journeyId.isEmpty) {
     // Fresh installs use the calm default journey immediately, so Continue
     // Journey never falls back to Home or asks the user to recover context.
     journeyId = 'journey_peace_7';
-    debugPrint('no journey found → starting default journey $journeyId');
+    _homeDebugLog('no journey found → starting default journey $journeyId');
     await LocalStorageService.startJourney(journeyId);
-    debugPrint('selected journey saved: $journeyId');
+    _homeDebugLog('selected journey saved: $journeyId');
   }
 
   final day = await LocalStorageService.currentJourneyDay();
-  debugPrint('opening day number: $day');
+  _homeDebugLog('opening day number: $day');
   if (!context.mounted) {
     return;
   }
@@ -747,7 +914,7 @@ Future<void> _continueJourneyFromHome(BuildContext context) async {
 }
 
 Future<void> _showNextJourneyPicker(BuildContext context) async {
-  debugPrint('StartNextJourney tapped');
+  _homeDebugLog('StartNextJourney tapped');
   final journeys = JourneyService.recommendedAfterCompletion();
   await showModalBottomSheet<void>(
     context: context,
@@ -769,9 +936,9 @@ Future<void> _startNextJourneyFromHome({
   required BuildContext sheetContext,
   required GitaJourneySummary journey,
 }) async {
-  debugPrint('selected journey id ${journey.id}');
+  _homeDebugLog('selected journey id ${journey.id}');
   await LocalStorageService.startJourney(journey.id);
-  debugPrint('navigation target JourneyDay ${journey.id} day 1');
+  _homeDebugLog('navigation target JourneyDay ${journey.id} day 1');
   if (!parentContext.mounted || !sheetContext.mounted) {
     return;
   }
@@ -1179,7 +1346,8 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
                   size: 18,
                 ),
                 label: Text(
-                    isComplete ? 'Choose Next Journey' : 'Continue Journey'),
+                  isComplete ? 'Start Next Journey' : 'Continue Journey',
+                ),
                 style: TextButton.styleFrom(
                   foregroundColor: kGold,
                   textStyle: gitaBody(size: 13, weight: FontWeight.w900),

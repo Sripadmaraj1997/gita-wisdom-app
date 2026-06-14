@@ -1,11 +1,24 @@
-// Legacy personalized plan generator.
-//
-// Builds a simple local practice plan from PersonalizationService preferences.
-// The current Bible-app-level habit feature is Journeys, but these models can
-// still inform future richer journeys or onboarding personalization.
-//
-// TODO(richer-journeys): Fold useful personalized-plan ideas into the Journey
-// content model after editorial review.
+/// ------------------------------------------------------------
+/// PersonalizedPlanService
+///
+/// Purpose:
+/// Legacy local practice-plan model retained for future Journey/editorial work.
+///
+/// Responsibilities:
+/// - Convert local personalization themes into a simple practice outline.
+/// - Keep older generated flows compiling while Journeys remains the primary
+///   habit feature.
+///
+/// Notes:
+/// Current product UX uses Journeys instead of personalized plans. This file is
+/// intentionally isolated so it can inform future reviewed wisdom collections
+/// without affecting the active Journey flow.
+///
+/// TODO(wisdom-collections): Fold useful plan ideas into reviewed Journey or
+/// wisdom collection content before exposing them more broadly.
+/// ------------------------------------------------------------
+library;
+
 import 'personalization_service.dart';
 
 class PersonalizedPlan {

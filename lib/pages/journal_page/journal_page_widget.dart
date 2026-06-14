@@ -1,8 +1,24 @@
-// Local journal screen.
-//
-// Journal entries are private to the device and stored through
-// LocalStorageService. The screen supports prompt-based creation, editing,
-// deletion, and optional verse/chapter references without requiring login.
+/// ------------------------------------------------------------
+/// JournalScreen
+///
+/// Purpose:
+/// Private local reflection journal.
+///
+/// Responsibilities:
+/// - Create, edit, and delete journal entries.
+/// - Support prompt-based entry creation from guidance and chapter flows.
+/// - Optionally link entries to a verse or chapter reference.
+/// - Count journaling as gentle reflection activity.
+///
+/// Data sources:
+/// - LocalStorageService for all journal persistence.
+///
+/// Notes:
+/// Journal text never leaves the device. Only lightweight local topic signals
+/// are used for continuity so the app can feel personal without feeling watched.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../services/local_storage_service.dart';

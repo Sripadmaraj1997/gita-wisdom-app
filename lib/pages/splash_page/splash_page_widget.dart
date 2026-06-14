@@ -1,14 +1,27 @@
-// Custom launch splash.
-//
-// This is the only in-app splash screen. It displays the Krishna image/branding,
-// waits briefly for a cinematic launch moment, then replaces itself with Home.
-// No Firebase/auth/onboarding checks are performed in the local MVP.
+/// ------------------------------------------------------------
+/// SplashScreen
+///
+/// Purpose:
+/// Calm launch moment before HomeScreen.
+///
+/// Responsibilities:
+/// - Display the app's Krishna image/branding.
+/// - Transition to Home once, without redirecting users away from a page they
+///   already opened.
+/// - Avoid auth/onboarding/network checks during launch.
+///
+/// Notes:
+/// The app is offline-first. Splash must never wait on Firebase, cloud state, or
+/// personalization setup; first launch should feel predictable and stable.
+/// ------------------------------------------------------------
+library;
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../gita_common/gita_common.dart';
-import '../home_page/home_page_widget.dart';
 
 const _darkKrishnaBlue = Color(0xFF071E3D);
 const _midnightNavy = Color(0xFF061A2E);
@@ -16,6 +29,13 @@ const _illuminatedGold = Color(0xFFD4AF37);
 const _softGold = Color(0xFFE6C76A);
 const _warmGoldGlow = Color(0xFFF4E7B2);
 const _lightText = Color(0xFFFFF7E8);
+
+void _splashDebugLog(String message) {
+  assert(() {
+    debugPrint(message);
+    return true;
+  }());
+}
 
 class SplashPageWidget extends StatefulWidget {
   const SplashPageWidget({super.key});
@@ -32,6 +52,7 @@ class _SplashPageWidgetState extends State<SplashPageWidget>
   late final AnimationController _fadeController;
   late final AnimationController _glowController;
   Timer? _navigationTimer;
+  bool _hasResolvedInitialRoute = false;
 
   @override
   void initState() {
@@ -46,7 +67,8 @@ class _SplashPageWidgetState extends State<SplashPageWidget>
       lowerBound: 0.72,
       upperBound: 1,
     )..repeat(reverse: true);
-    debugPrint('Splash started');
+    _splashDebugLog('app init started');
+    _splashDebugLog('Splash started');
     // Delay navigation until after the first frame so the custom splash is
     // visibly painted before the timed transition begins.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -69,22 +91,31 @@ class _SplashPageWidgetState extends State<SplashPageWidget>
     if (!mounted) {
       return;
     }
-    debugPrint('Navigating to Home');
-    Navigator.of(context).pushReplacement<void, void>(
-      PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 520),
-        reverseTransitionDuration: const Duration(milliseconds: 260),
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const HomePageWidget(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          );
-          return FadeTransition(opacity: curved, child: child);
-        },
-      ),
-    );
+    if (_hasResolvedInitialRoute) {
+      _splashDebugLog(
+        'automatic redirect skipped: initial route already resolved',
+      );
+      return;
+    }
+    _hasResolvedInitialRoute = true;
+
+    final router = GoRouter.of(context);
+    final routeBeforeInit =
+        router.routerDelegate.currentConfiguration.uri.toString();
+    _splashDebugLog('route before init: $routeBeforeInit');
+    if (routeBeforeInit != SplashPageWidget.routePath) {
+      _splashDebugLog(
+        'automatic redirect skipped: user already navigated to $routeBeforeInit',
+      );
+      return;
+    }
+
+    _splashDebugLog('automatic redirect reason: splash completed');
+    context.go('/homePage');
+    final routeAfterInit =
+        router.routerDelegate.currentConfiguration.uri.toString();
+    _splashDebugLog('route after init: $routeAfterInit');
+    _splashDebugLog('app init completed');
   }
 
   @override

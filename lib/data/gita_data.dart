@@ -1,13 +1,36 @@
-// Local Bhagavad Gita data layer.
-//
-// This service is the source of truth for scripture content. It loads the
-// chapter JSON files from assets/data/gita/, merges optional reflections from
-// assets/data/reflections.json, validates the expected 18 chapters / 700 verses,
-// and exposes search/retrieval helpers used by Home, Read, Search, Ask Gita
-// Lite, and Verse Reader.
-//
-// Future semantic retrieval should keep this local JSON loader as the offline
-// fallback and should not replace verified scripture data.
+/// ------------------------------------------------------------
+/// GitaDataService / GitaRepository
+///
+/// Purpose:
+/// Source of truth for bundled Bhagavad Gita scripture content.
+///
+/// Responsibilities:
+/// - Load chapter JSON files from assets/data/gita/.
+/// - Merge optional reviewed reflection/practice content.
+/// - Validate the expected 18 chapters and 700 verses.
+/// - Serve verse/chapter lookup for Home, Read, Search, Ask Gita, and Verse
+///   Reader.
+/// - Rank local search results without cloud search or AI.
+///
+/// Search ranking strategy:
+/// 1. Exact verse references.
+/// 2. Emotional/topic tags.
+/// 3. Gita Wisdom Interpretation.
+/// 4. Reflection.
+/// 5. Practice Today.
+/// 6. Translation.
+/// 7. Transliteration/Sanskrit/chapter context.
+///
+/// Notes:
+/// Emotional search expands terms such as fear, stress, anger, purpose, and
+/// attachment into related Gita themes while preserving exact verse lookup and
+/// scripture fidelity.
+///
+/// TODO(wisdom-collections): If curated collections are added, keep this local
+/// repository as the scripture source of truth.
+/// ------------------------------------------------------------
+library;
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -103,6 +126,10 @@ class GitaVerse {
     );
     final sanskrit = sanskritField?.value ?? '';
     final transliteration = transliterationField?.value ?? '';
+    // Translation provenance:
+    // Preserve bundled translation text from assets/data/gita/chapter*.json.
+    // App-authored practical interpretation belongs in ContentQualityFramework,
+    // not in scripture translation fields.
     final englishTranslation = englishTranslationField?.value ?? '';
     final meaning = meaningField?.value ?? '';
     return GitaVerse(
@@ -152,6 +179,9 @@ class GitaVerse {
     final reviewed = ContentQualityFramework.interpretationForVerse(id);
     if (reviewed != null) {
       return reviewed;
+    }
+    if (_containsArchaicDevotionalPronouns(cleanMeaning)) {
+      return '';
     }
     return cleanMeaning;
   }
@@ -253,6 +283,13 @@ String cleanLocalMeaning(String source) {
       .replaceAll(RegExp(r'\s+'), ' ')
       .replaceAll(' - .', '.')
       .trim();
+}
+
+bool _containsArchaicDevotionalPronouns(String source) {
+  return RegExp(
+    r'\b(thy|thee|thou|hath|dost|shalt|whence|thereof)\b',
+    caseSensitive: false,
+  ).hasMatch(source);
 }
 
 class GitaSearchResult {
@@ -870,7 +907,7 @@ class GitaRepository {
       final sanskritText = verse.sanskrit.toLowerCase();
       final transliterationText = verse.transliteration.toLowerCase();
       final translationText = verse.englishTranslation.toLowerCase();
-      final meaningText = verse.meaning.toLowerCase();
+      final meaningText = verse.gitaWisdomInterpretation.toLowerCase();
       final reflectionText = verse.reflectionText.toLowerCase();
       final practiceText = verse.practiceToday.toLowerCase();
       final tagText = verse.allTags.join(' ').toLowerCase();
@@ -895,10 +932,12 @@ class GitaRepository {
 
       // Ranking priority:
       // 1. exact chapter/verse references
-      // 2. tags and topic terms
-      // 3. reflection / practice text
-      // 4. translation and Gita Wisdom Interpretation (stored as meaning)
-      // 5. transliteration / Sanskrit matches
+      // 2. emotional tag matches
+      // 3. Gita Wisdom Interpretation (stored as meaning)
+      // 4. reflection text
+      // 5. Practice Today
+      // 6. scripture translation
+      // 7. transliteration / Sanskrit matches
       var rankingScore = 0;
       final exactReferenceMatch = normalizedQuery == verse.id ||
           normalizedQuery == '${verse.chapterNumber}.${verse.verseNumber}' ||
@@ -913,27 +952,29 @@ class GitaRepository {
         rankingScore += 70;
       }
       if (tagText.contains(normalizedQuery)) {
-        rankingScore += 55;
+        rankingScore += 72;
       }
-      if (reflectionText.contains(normalizedQuery) ||
-          practiceText.contains(normalizedQuery)) {
+      if (meaningText.contains(normalizedQuery)) {
+        rankingScore += 56;
+      }
+      if (reflectionText.contains(normalizedQuery)) {
+        rankingScore += 48;
+      }
+      if (practiceText.contains(normalizedQuery)) {
         rankingScore += 42;
       }
       if (translationText.contains(normalizedQuery)) {
-        rankingScore += 30;
+        rankingScore += 34;
       }
       if (originalTerms.isNotEmpty &&
           originalTerms.every(translationText.contains)) {
-        rankingScore += 40;
+        rankingScore += 36;
       } else if (originalTerms.isNotEmpty &&
           originalTerms.every(
             (term) =>
                 translationText.contains(term) || meaningText.contains(term),
           )) {
-        rankingScore += 25;
-      }
-      if (meaningText.contains(normalizedQuery)) {
-        rankingScore += 24;
+        rankingScore += 28;
       }
       if (transliterationText.contains(normalizedQuery)) {
         rankingScore += 18;
@@ -943,19 +984,19 @@ class GitaRepository {
       }
       for (final term in terms) {
         if (tagText.contains(term)) {
-          rankingScore += 12;
+          rankingScore += 15;
+        }
+        if (meaningText.contains(term)) {
+          rankingScore += 11;
         }
         if (reflectionText.contains(term)) {
-          rankingScore += 9;
+          rankingScore += 10;
         }
         if (practiceText.contains(term)) {
-          rankingScore += 8;
+          rankingScore += 9;
         }
         if (translationText.contains(term)) {
           rankingScore += 7;
-        }
-        if (meaningText.contains(term)) {
-          rankingScore += 5;
         }
         if (transliterationText.contains(term)) {
           rankingScore += 4;
@@ -1002,17 +1043,24 @@ class GitaRepository {
 
 String _expandSpiritualSearchQuery(String query) {
   const topicMap = {
-    'anxiety': ['fear', 'peace', 'mind', 'steady', 'calm'],
-    'worry': ['fear', 'peace', 'mind', 'steady', 'calm'],
-    'stress': ['peace', 'mind', 'action', 'steady'],
-    'anger': ['anger', 'desire', 'mind', 'control'],
-    'discipline': ['practice', 'mind', 'yoga', 'action'],
+    'anxiety': ['fear', 'worry', 'uncertainty', 'peace', 'mind', 'steady'],
+    'worry': ['fear', 'anxiety', 'uncertainty', 'peace', 'mind', 'steady'],
+    'stress': ['anxiety', 'overwhelm', 'peace', 'mind', 'action', 'steady'],
+    'anger': ['frustration', 'resentment', 'desire', 'mind', 'control'],
+    'frustration': ['anger', 'resentment', 'desire', 'mind', 'control'],
+    'resentment': ['anger', 'frustration', 'desire', 'mind', 'control'],
+    'discipline': ['focus', 'self-control', 'practice', 'mind', 'action'],
+    'focus': ['discipline', 'self-control', 'practice', 'mind'],
+    'self-control': ['discipline', 'focus', 'practice', 'mind'],
     'attachment': ['attachment', 'fruit', 'result', 'karma', 'action'],
-    'purpose': ['dharma', 'duty', 'action', 'purpose'],
+    'purpose': ['meaning', 'direction', 'dharma', 'duty', 'action'],
+    'meaning': ['purpose', 'direction', 'dharma', 'duty', 'action'],
+    'direction': ['purpose', 'meaning', 'dharma', 'duty', 'action'],
     'peace': ['peace', 'mind', 'steady', 'devotion'],
     'karma': ['karma', 'action', 'duty', 'work'],
     'devotion': ['devotion', 'surrender', 'love', 'worship'],
-    'fear': ['fear', 'peace', 'self', 'mind'],
+    'fear': ['anxiety', 'worry', 'uncertainty', 'peace', 'self', 'mind'],
+    'uncertainty': ['fear', 'anxiety', 'worry', 'peace', 'mind'],
     'clarity': ['clarity', 'wisdom', 'knowledge', 'mind', 'steady'],
   };
   final additions = <String>[];

@@ -1,7 +1,20 @@
-// Support screen.
-//
-// Provides a simple, stable contact point for help and feedback. The content is
-// intentionally short so it remains readable on small devices.
+/// ------------------------------------------------------------
+/// SupportScreen
+///
+/// Purpose:
+/// Simple support and feedback contact point.
+///
+/// Responsibilities:
+/// - Show gitawisdomapp@gmail.com clearly.
+/// - Open a safe mailto link when supported by the platform.
+/// - Keep fallback text readable if email launch fails.
+///
+/// Notes:
+/// Support copy is intentionally short so it works on small phones and feels
+/// calm rather than like a help-center portal.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 

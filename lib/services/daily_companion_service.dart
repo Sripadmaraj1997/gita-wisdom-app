@@ -1,11 +1,24 @@
-// Daily companion content.
-//
-// Provides a small rotating set of local guidance entries used by Home and One
-// Minute Wisdom. Keeping this data in one service avoids duplicating reflection
-// copy across screens and makes future editorial expansion straightforward.
-//
-// TODO(stronger-content-review): Move this editorial list to a reviewed,
-// versioned local JSON file if it grows beyond a small hand-curated set.
+/// ------------------------------------------------------------
+/// DailyCompanionService
+///
+/// Purpose:
+/// Small local set of daily guidance entries for Home.
+///
+/// Responsibilities:
+/// - Provide a date-rotated verse, reflection, Practice Today, and journal
+///   prompt.
+/// - Keep Today's Guidance consistent across Home and related companion flows.
+/// - Avoid duplicated editorial copy in UI widgets.
+///
+/// Notes:
+/// The daily companion is intentionally local and deterministic. It should feel
+/// like a steady spiritual rhythm, not a notification-driven content feed.
+///
+/// TODO(wisdom-collections): Move this list to reviewed versioned JSON if it
+/// grows into curated wisdom collections.
+/// ------------------------------------------------------------
+library;
+
 class DailyGuidance {
   const DailyGuidance({
     required this.verseId,

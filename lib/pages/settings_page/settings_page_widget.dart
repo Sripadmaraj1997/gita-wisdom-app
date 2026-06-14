@@ -1,8 +1,25 @@
-// Settings screen for the local MVP.
-//
-// Contains only working, user-facing controls: reader preferences, support
-// links, about/disclaimer copy, and a local data reset. There are no account,
-// subscription, Firebase, or OpenAI settings in this offline build.
+/// ------------------------------------------------------------
+/// SettingsScreen
+///
+/// Purpose:
+/// Local app preferences, support, privacy, and reset controls.
+///
+/// Responsibilities:
+/// - Manage reader font size and Sanskrit/transliteration visibility.
+/// - Link to Privacy Policy and Support.
+/// - Show About/disclaimer copy for content provenance.
+/// - Clear local data safely when requested.
+///
+/// Data sources:
+/// - LocalStorageService for preferences and local data reset.
+/// - ReadingProgressService for Continue Reading reset.
+///
+/// Notes:
+/// There are no account, subscription, Firebase, cloud, or OpenAI settings in
+/// this offline-first build, so Settings intentionally remains small.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -145,7 +162,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
         backgroundColor: kCard,
         title: Text('Clear local data?', style: gitaTitle(22)),
         content: Text(
-          'This removes saved verses, highlights, journal entries, journey progress, Ask Gita history, font size, and continue reading progress from this device only.',
+          'This removes saved verses, highlights, journal entries, journey progress, Ask Gita history, personalized guidance signals, font size, and continue reading progress from this device only.',
           style: gitaBody(color: kText),
         ),
         actions: [

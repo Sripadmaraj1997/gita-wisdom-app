@@ -1,16 +1,25 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gita_wisdom/services/ask_gita_lite_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
   const prompts = [
     'I am anxious.',
     'I am anxious about my future.',
     'I am worried about my future.',
     'I feel angry.',
+    'I feel lost.',
     'I lost motivation.',
     'I am attached to results.',
+    'I fear failure.',
+    'I cannot focus.',
+    'I feel overwhelmed.',
     'I feel overwhelmed at work.',
     'How do I find peace?',
     'I am afraid of failure.',
@@ -82,10 +91,13 @@ void main() {
       'I am afraid of failure.': 'fear',
       'I am grieving a loss.': 'grief',
       'I feel uncertain about what to do.': 'uncertainty',
+      'I feel lost.': 'uncertainty',
       'I feel overwhelmed at work.': 'work pressure',
+      'I feel overwhelmed.': 'anxiety',
       'I feel confused about my purpose.': 'purpose',
       'I am attached to results.': 'attachment',
       'I need discipline and consistency.': 'discipline',
+      'I cannot focus.': 'discipline',
       'How do I grow in devotion?': 'devotion',
       'I am anxious.': 'anxiety',
     };

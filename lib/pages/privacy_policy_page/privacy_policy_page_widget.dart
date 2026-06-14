@@ -1,8 +1,22 @@
-// Privacy Policy screen.
-//
-// Presents the app's local-first privacy posture in a readable, scrollable
-// format. This page is linked from Settings so users can review data handling
-// without leaving the app.
+/// ------------------------------------------------------------
+/// PrivacyPolicyScreen
+///
+/// Purpose:
+/// User-facing privacy explanation for the offline-first app.
+///
+/// Responsibilities:
+/// - Explain local storage of progress, saved verses, highlights, journal
+///   entries, journey progress, and preferences.
+/// - Clarify that Gita Wisdom does not sell personal information or track users
+///   across apps.
+/// - Mention external community links without hiding that they leave the app.
+///
+/// Notes:
+/// This screen supports store readiness and user trust. Keep it readable,
+/// scrollable, and aligned with the actual local-only architecture.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 
 import '../gita_common/gita_common.dart';
@@ -45,7 +59,8 @@ class _PrivacyPolicyCard extends StatelessWidget {
 
   static const _items = [
     'Gita Wisdom is designed to work primarily offline.',
-    'Reading progress, saved verses, highlights, journal entries, journey progress, and preferences are stored locally on your device.',
+    'Reading progress, saved verses, highlights, journal entries, journey progress, personalization signals, and preferences are stored locally on your device.',
+    'Personalized guidance is based only on local app activity and does not require an account or cloud sync.',
     'Gita Wisdom does not sell personal information.',
     'Gita Wisdom does not track users across apps.',
     'Community links may open external services such as WhatsApp.',

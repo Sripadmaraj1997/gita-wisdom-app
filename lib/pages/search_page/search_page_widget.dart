@@ -1,10 +1,30 @@
-// Gita search screen.
-//
-// Searches local scripture, Gita Wisdom Interpretation, reflections, Practice
-// Today text, tags, and verse references. Topic chips seed emotional searches
-// such as peace, fear, anger, and attachment. Ranking lives in
-// GitaRepository.search so SearchScreen only handles UX state and exact
-// navigation into Verse Reader.
+/// ------------------------------------------------------------
+/// SearchScreen
+///
+/// Purpose:
+/// Local scripture and emotional topic search.
+///
+/// Responsibilities:
+/// - Search verse references, translation, transliteration, interpretation,
+///   reflection, Practice Today, tags, and chapter context.
+/// - Provide topic chips for common emotional searches.
+/// - Navigate exact results into VerseReaderScreen.
+/// - Record only local topic signals for personalization.
+///
+/// Ranking strategy:
+/// 1. Exact verse
+/// 2. Emotional tags
+/// 3. Gita Wisdom Interpretation
+/// 4. Reflection
+/// 5. Practice Today
+/// 6. Translation
+///
+/// Notes:
+/// Emotional search is meant to feel spiritually aware without cloud search or
+/// AI. GitaRepository owns ranking so this screen stays focused on UX state.
+/// ------------------------------------------------------------
+library;
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,6 +32,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/gita_data.dart';
 import '../../services/local_storage_service.dart';
+import '../../services/personalization_service.dart';
 import '../gita_common/gita_common.dart';
 
 class SearchPageWidget extends StatefulWidget {
@@ -81,6 +102,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
             ? GitaRepository.search('2.47', limit: 12)
             : GitaRepository.search(query, limit: 40);
       });
+      unawaited(PersonalizationService.recordEmotionalSearch(query));
     });
   }
 

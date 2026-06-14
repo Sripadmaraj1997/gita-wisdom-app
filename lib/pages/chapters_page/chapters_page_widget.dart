@@ -1,8 +1,23 @@
-// Read / Chapters screen.
-//
-// Displays the 18 local Bhagavad Gita chapters and a lightweight chapter/verse
-// search. Chapter cards open VerseReaderScreen at verse 1 of the selected
-// chapter; verse search results open exact verse IDs.
+/// ------------------------------------------------------------
+/// ReadGitaScreen
+///
+/// Purpose:
+/// Chapter library entry point for reading the Bhagavad Gita.
+///
+/// Responsibilities:
+/// - Display the 18 local chapters.
+/// - Support lightweight chapter/verse search.
+/// - Open VerseReaderScreen at chapter verse 1 or an exact verse result.
+///
+/// Data sources:
+/// - GitaDataService for local chapter metadata and verse counts.
+///
+/// Notes:
+/// This screen is intentionally simple: choose a chapter, then let
+/// VerseReaderScreen provide the immersive reading experience.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 

@@ -5,6 +5,29 @@ import 'package:gita_wisdom/services/content_quality_framework.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  const priorityVerseIds = [
+    '2.14',
+    '2.47',
+    '2.50',
+    '2.56',
+    '2.70',
+    '3.19',
+    '3.30',
+    '4.7',
+    '4.8',
+    '4.38',
+    '5.10',
+    '6.5',
+    '6.6',
+    '6.26',
+    '9.22',
+    '9.26',
+    '12.13',
+    '12.14',
+    '12.15',
+    '18.66',
+  ];
+
   const bannedPhrases = [
     'this verse teaches',
     'in modern life',
@@ -19,6 +42,10 @@ void main() {
     'lorem ipsum',
     'placeholder',
   ];
+  final archaicLanguagePattern = RegExp(
+    r'\b(thy|thee|thou|hath|dost|shalt|whence|thereof)\b',
+    caseSensitive: false,
+  );
 
   test('top 100 important verses have reviewed human reflection content',
       () async {
@@ -71,28 +98,6 @@ void main() {
   test('curated priority verses have reviewed interpretation and topic tags',
       () async {
     final bundle = await GitaRepository.load();
-    const requiredPriorityVerses = [
-      '2.14',
-      '2.47',
-      '2.50',
-      '2.56',
-      '2.70',
-      '3.19',
-      '3.30',
-      '4.7',
-      '4.8',
-      '4.38',
-      '5.10',
-      '6.5',
-      '6.6',
-      '6.26',
-      '9.22',
-      '9.26',
-      '12.13',
-      '12.14',
-      '12.15',
-      '18.66',
-    ];
     const expectedTopics = [
       'peace',
       'fear',
@@ -104,7 +109,12 @@ void main() {
       'clarity',
     ];
 
-    for (final verseId in requiredPriorityVerses) {
+    expect(
+      ContentQualityFramework.verseExcellencePriorityVerseIds,
+      priorityVerseIds,
+    );
+
+    for (final verseId in priorityVerseIds) {
       expect(
         ContentQualityFramework.topImportantVerseIds,
         contains(verseId),
@@ -123,6 +133,110 @@ void main() {
         expectedTopics.any(searchableTags.contains),
         isTrue,
         reason: verseId,
+      );
+    }
+  });
+
+  test('Verse Excellence Program keeps five content layers strong', () async {
+    final bundle = await GitaRepository.load();
+    const actionVerbs = [
+      'ask',
+      'begin',
+      'choose',
+      'complete',
+      'do',
+      'focus',
+      'guide',
+      'let',
+      'name',
+      'notice',
+      'offer',
+      'pause',
+      'place',
+      'return',
+      'speak',
+      'surrender',
+      'when',
+    ];
+
+    for (final verseId
+        in ContentQualityFramework.verseExcellencePriorityVerseIds) {
+      final verse = bundle.verseById(verseId);
+      final content = ContentQualityFramework.contentForVerse(verseId);
+
+      expect(verse, isNotNull, reason: verseId);
+      expect(content, isNotNull, reason: verseId);
+
+      final translation = verse!.englishTranslation.trim();
+      final interpretation = content!.gitaWisdomInterpretation.trim();
+      final reflection = content.reflection.text.trim();
+      final practice = content.practiceToday.text.trim();
+      final tags = content.topicTags.values;
+
+      // Translation stays scripture-only. The app must not mix the practical
+      // interpretation layer into the trusted local scripture translation.
+      expect(translation, isNotEmpty, reason: verseId);
+      expect(translation.toLowerCase(), isNot(contains('gita wisdom')),
+          reason: verseId);
+      expect(translation, isNot(interpretation), reason: verseId);
+      expect(translation, isNot(reflection), reason: verseId);
+
+      final interpretationSentenceCount =
+          RegExp(r'[.!?]').allMatches(interpretation).length;
+      expect(interpretationSentenceCount, inInclusiveRange(2, 4),
+          reason: verseId);
+      expect(interpretation.length, greaterThan(80), reason: verseId);
+
+      final reflectionSentenceCount =
+          RegExp(r'[.!?]').allMatches(reflection).length;
+      expect(reflectionSentenceCount, inInclusiveRange(2, 4), reason: verseId);
+
+      final combinedReviewedText = [
+        interpretation,
+        reflection,
+        practice,
+      ].join('\n').toLowerCase();
+      for (final phrase in bannedPhrases) {
+        expect(combinedReviewedText, isNot(contains(phrase)), reason: verseId);
+      }
+      expect(
+        archaicLanguagePattern.hasMatch(combinedReviewedText),
+        isFalse,
+        reason: verseId,
+      );
+
+      expect(practice.split(RegExp(r'\s+')), hasLength(lessThan(20)),
+          reason: verseId);
+      expect(
+        actionVerbs.any((verb) => practice.toLowerCase().startsWith(verb)),
+        isTrue,
+        reason: verseId,
+      );
+
+      expect(tags.length, greaterThanOrEqualTo(5), reason: verseId);
+      expect(tags.toSet(), hasLength(tags.length), reason: verseId);
+      expect(
+        tags.any(ContentQualityFramework.emotionalSearchTags.contains),
+        isTrue,
+        reason: verseId,
+      );
+    }
+  });
+
+  test('app-authored wisdom layers use modern approachable English', () async {
+    final bundle = await GitaRepository.load();
+
+    for (final verse in bundle.verses) {
+      final appAuthoredText = [
+        verse.gitaWisdomInterpretation,
+        verse.reflectionText,
+        verse.practiceToday,
+      ].join('\n');
+
+      expect(
+        archaicLanguagePattern.hasMatch(appAuthoredText),
+        isFalse,
+        reason: verse.id,
       );
     }
   });

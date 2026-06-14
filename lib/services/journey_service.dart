@@ -1,8 +1,27 @@
-// Shared Journey summary and current-progress selection.
-//
-// The detailed daily Journey content lives in the Journeys screen, while this
-// service exposes lightweight metadata for Home. Keeping the summary here lets
-// Home show "Current Journey" without importing screen-private widget models.
+/// ------------------------------------------------------------
+/// JourneyService
+///
+/// Purpose:
+/// Shared Journey metadata and current-progress selection.
+///
+/// Responsibilities:
+/// - Expose lightweight Journey summaries for Home.
+/// - Derive the active Journey and next incomplete day from local progress.
+/// - Identify completed Journeys without importing screen-private day models.
+///
+/// State model:
+/// - currentJourneyId chooses the active guided path.
+/// - currentJourneyDay stores the day the user should resume.
+/// - completedDays comes from LocalStorageService.journeyProgress().
+/// - completedJourneys remains separate so completion is visible after the next
+///   Journey starts.
+///
+/// Notes:
+/// TransformationPageWidget owns day-level UI because Continue Journey, Start
+/// Next Journey, and Journey Complete require the full daily content.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/foundation.dart';
 
 import 'local_storage_service.dart';
@@ -82,6 +101,8 @@ class JourneyService {
   ];
 
   static Future<GitaCurrentJourney> currentJourney() async {
+    // Home calls this during build. Keep it fast and side-effect free: read the
+    // selected journey and progress, then derive the next incomplete day.
     final progress = await LocalStorageService.journeyProgress();
     final selectedJourneyId = await LocalStorageService.currentJourneyId();
     return currentJourneyFromProgress(
@@ -125,7 +146,7 @@ class JourneyService {
 
     for (final journey in journeys) {
       final completed = progress[journey.id] ?? <int>{};
-      if (completed.length >= journey.totalDays) {
+      if (kDebugMode && completed.length >= journey.totalDays) {
         debugPrint('Journey completion detected: ${journey.id}');
       }
       if (completed.isNotEmpty && completed.length < journey.totalDays) {

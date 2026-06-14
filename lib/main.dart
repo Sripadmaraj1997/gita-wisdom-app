@@ -1,9 +1,24 @@
-// Gita Wisdom app entry point.
-//
-// This MVP is intentionally offline-first: all scripture content, reflections,
-// journal entries, saved verses, reader preferences, and reading progress are
-// stored locally. There is no Firebase, login, subscription, or OpenAI startup
-// dependency, which keeps app launch fast and predictable.
+/// ------------------------------------------------------------
+/// AppEntryPoint
+///
+/// Purpose:
+/// Bootstrap Gita Wisdom and configure app-wide routing/theme setup.
+///
+/// Architecture:
+/// Gita Wisdom is intentionally offline-first. Scripture, reflections, saved
+/// verses, journal entries, reading preferences, journey progress, and local
+/// personalization signals live on device through bundled JSON and
+/// SharedPreferences-backed services.
+///
+/// Notes:
+/// There is no Firebase, login, cloud sync, or OpenAI startup dependency. Launch
+/// should stay fast, predictable, and available without network access.
+///
+/// TODO(cloud-sync): If accounts are introduced later, keep offline startup as
+/// the baseline and sync after the app is already usable.
+/// ------------------------------------------------------------
+library;
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -16,7 +31,10 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  debugPrint('App started');
+  assert(() {
+    debugPrint('App started');
+    return true;
+  }());
 
   // Keep web URLs clean and route-driven. The initial route is the custom
   // SplashScreen, which transitions directly into Home.

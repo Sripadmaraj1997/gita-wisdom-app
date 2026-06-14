@@ -1,11 +1,25 @@
-// Reflection data service.
-//
-// Loads optional verse-level reflections and Practice Today prompts from
-// assets/data/reflections.json. This service is deliberately separate from the
-// main Gita dataset so editorial reflections can be updated independently.
-//
-// TODO(community-backend): If reflections become community-authored, validate
-// and bundle a reviewed local export rather than loading untrusted text.
+/// ------------------------------------------------------------
+/// ReflectionService
+///
+/// Purpose:
+/// Optional local reflection and Practice Today overlay for verses.
+///
+/// Responsibilities:
+/// - Load reviewed reflection content from assets/data/reflections.json.
+/// - Match content by chapter and verse number.
+/// - Keep editorial reflection data independent from scripture translation
+///   loading.
+///
+/// Notes:
+/// Reflections are app study notes, not scripture translation. Keeping this
+/// service separate protects translation authenticity while allowing practical
+/// daily content to improve over time.
+///
+/// TODO(community-backend): If reflections become community-authored, validate
+/// and bundle a reviewed local export rather than loading untrusted text.
+/// ------------------------------------------------------------
+library;
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

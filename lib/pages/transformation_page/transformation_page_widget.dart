@@ -1,13 +1,42 @@
-// Journeys screen.
-//
-// Calm local study paths inspired by proven spiritual app patterns. Journey
-// definitions are bundled in the app; progress is stored in shared_preferences
-// through LocalStorageService. No account, feed, or social surface is involved.
+/// ------------------------------------------------------------
+/// JourneyScreen
+///
+/// Purpose:
+/// Guided local spiritual paths with daily verse, reflection, practice, and
+/// journal prompts.
+///
+/// Responsibilities:
+/// - Show all available Journeys and the active current day.
+/// - Keep completed days, current day, and future days understandable.
+/// - Persist day completion immediately.
+/// - Handle Continue Journey, Start Next Journey, Day Complete, and Journey
+///   Complete flows.
+/// - Preserve Back to Journey context when a verse opens in VerseReaderScreen.
+///
+/// State model:
+/// - currentJourneyId: active guided path.
+/// - currentJourneyDay: day Home/Journeys should resume.
+/// - completedDays: completed day numbers for each journey.
+/// - completedJourneys: completed journey IDs retained after the next path starts.
+///
+/// Notes:
+/// Users should never feel lost. Journey flow should always show where they are,
+/// what comes next, and how to return.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../services/local_storage_service.dart';
 import '../gita_common/gita_common.dart';
+
+void _journeyDebugLog(String message) {
+  assert(() {
+    debugPrint(message);
+    return true;
+  }());
+}
 
 class TransformationPageWidget extends StatefulWidget {
   const TransformationPageWidget({
@@ -784,22 +813,22 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     required bool isComplete,
     required List<_Journey> recommendedJourneys,
   }) async {
-    debugPrint('Continue Journey tapped');
-    debugPrint('activeJourneyId: ${activeJourneyId ?? 'none'}');
-    debugPrint('currentDay: ${highlightedDay.day}');
+    _journeyDebugLog('Continue Journey tapped');
+    _journeyDebugLog('activeJourneyId: ${activeJourneyId ?? 'none'}');
+    _journeyDebugLog('currentDay: ${highlightedDay.day}');
     final highlightedCompleted = completedDays.contains(highlightedDay.day);
-    debugPrint('currentDayCompleted: $highlightedCompleted');
+    _journeyDebugLog('currentDayCompleted: $highlightedCompleted');
 
     if (activeJourneyId == null || activeJourneyId.isEmpty) {
       await LocalStorageService.setCurrentJourneyDay(
         journeyId: current.id,
         day: highlightedDay.day,
       );
-      debugPrint('selected journey saved: ${current.id}');
+      _journeyDebugLog('selected journey saved: ${current.id}');
     }
 
     if (isComplete) {
-      debugPrint('navigation target: Journey Complete');
+      _journeyDebugLog('navigation target: Journey Complete');
       if (recommendedJourneys.isNotEmpty) {
         _chooseNextJourney(recommendedJourneys);
       } else {
@@ -809,7 +838,7 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     }
 
     final targetDay = highlightedCompleted ? nextIncompleteDay : highlightedDay;
-    debugPrint('navigation target: Day ${targetDay.day}');
+    _journeyDebugLog('navigation target: Day ${targetDay.day}');
     await _selectJourneyDay(current, targetDay, scrollToTop: true);
     if (!mounted) {
       return;
@@ -824,7 +853,7 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
   }
 
   Future<void> _chooseNextJourney(List<_Journey> journeys) async {
-    debugPrint('StartNextJourney tapped');
+    _journeyDebugLog('StartNextJourney tapped');
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -844,11 +873,11 @@ class _TransformationPageWidgetState extends State<TransformationPageWidget> {
     required _Journey journey,
     bool closeSheet = true,
   }) async {
-    debugPrint('selected journey id ${journey.id}');
+    _journeyDebugLog('selected journey id ${journey.id}');
     // Starting a new Journey resets only that Journey's active day. Previously
     // completed Journeys remain complete so Home can show meaningful continuity.
     await LocalStorageService.startJourney(journey.id);
-    debugPrint('navigation target JourneyDay ${journey.id} day 1');
+    _journeyDebugLog('navigation target JourneyDay ${journey.id} day 1');
     if (!mounted || !sheetContext.mounted) {
       return;
     }
@@ -1134,7 +1163,7 @@ class _CurrentJourneyCard extends StatelessWidget {
               children: [
                 GoldButton(
                   label: isJourneyComplete
-                      ? 'Choose Next Journey'
+                      ? 'Start Next Journey'
                       : 'Continue Journey',
                   icon: isJourneyComplete
                       ? Icons.route_rounded
@@ -1264,7 +1293,7 @@ class _DayCompleteCard extends StatelessWidget {
             runSpacing: 10,
             children: [
               GoldButton(
-                label: isFinalDay ? 'Choose Next Journey' : 'Continue Journey',
+                label: isFinalDay ? 'Start Next Journey' : 'Continue Journey',
                 icon: Icons.route_rounded,
                 onPressed: onContinue,
               ),

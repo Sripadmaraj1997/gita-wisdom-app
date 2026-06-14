@@ -1,8 +1,25 @@
-// Saved wisdom library.
-//
-// Combines three local collections: saved verses, highlighted verse IDs, and
-// saved reflections. Highlight IDs are resolved through GitaDataService so the
-// UI always displays the latest local scripture data.
+/// ------------------------------------------------------------
+/// SavedWisdomScreen
+///
+/// Purpose:
+/// Private local library for saved verses, highlights, and reflections.
+///
+/// Responsibilities:
+/// - Load saved verse snapshots.
+/// - Resolve highlighted verse IDs against the latest local Gita dataset.
+/// - Display saved reflections and Practice Today prompts.
+/// - Support removing local saved items.
+///
+/// Data sources:
+/// - LocalStorageService for user-owned saved data.
+/// - GitaDataService for current scripture text behind highlight IDs.
+///
+/// Notes:
+/// Highlights store IDs instead of full verse text so scripture display remains
+/// consistent if the bundled local dataset is refined later.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -380,6 +397,7 @@ class _HighlightedVerseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final interpretation = verse.gitaWisdomInterpretation.trim();
     return PremiumCard(
       accent: true,
       onTap: () => context.push(Uri(
@@ -422,9 +440,9 @@ class _HighlightedVerseCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            verse.meaning.trim().isEmpty
+            interpretation.isEmpty
                 ? 'Reflect on this verse as guidance for steady action, inner clarity, and peaceful living.'
-                : verse.meaning,
+                : interpretation,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: gitaBody(color: kMuted, size: 13),

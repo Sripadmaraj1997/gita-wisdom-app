@@ -1,19 +1,51 @@
-// Local persistence for the offline MVP.
-//
-// All user-owned data lives in shared_preferences: saved verses, highlights,
-// journal entries, Ask Gita Lite history, reading preferences, daily reflection
-// streaks, and recent items. Keeping this service isolated makes future cloud
-// sync possible without touching the UI screens.
-//
-// TODO(cloud-sync): If accounts are introduced, keep these keys as the local
-// cache contract and sync them through a repository layer instead of reading
-// SharedPreferences directly from UI widgets.
+/// ------------------------------------------------------------
+/// StorageService
+///
+/// Purpose:
+/// Single local persistence boundary for the offline-first app.
+///
+/// Responsibilities:
+/// - Store saved verses, highlights, saved reflections, journal entries, and
+///   Ask Gita history.
+/// - Store reader preferences and Continue/Journey continuity.
+/// - Track Days of Reflection without pressure or account identity.
+/// - Keep UI widgets from reading SharedPreferences directly.
+///
+/// Architecture:
+/// Gita Wisdom intentionally has no Firebase, cloud account, or OpenAI runtime
+/// dependency. Screens call this service for private local state, while
+/// scripture and editorial content come from bundled JSON assets.
+///
+/// SharedPreferences keys:
+/// - gita_saved_verses: JSON list of saved scripture snapshots.
+/// - gita_saved_reflections: JSON list of saved reflection/practice snapshots.
+/// - gita_highlighted_verses: string list of highlighted verse IDs.
+/// - gita_journal_entries: JSON list of local journal entries.
+/// - gita_ask_history: compact local Ask Gita history.
+/// - gita_recent_verses: recently opened verse snapshots for continuity.
+/// - gita_recent_reflections: recently reflected topics/verses for Home.
+/// - gita_completed_practice_dates: date keys for Days of Reflection.
+/// - gita_reader_font_scale: reader typography preference.
+/// - gita_reader_show_sanskrit: Sanskrit visibility preference.
+/// - gita_reader_show_transliteration: transliteration visibility preference.
+/// - gita_theme_mode: local visual theme choice.
+/// - gita_current_journey: currentJourneyId; active guided path.
+/// - gita_current_journey_day: currentJourneyDay; day to resume.
+/// - gita_reading_plan_progress: completedDaysByJourney as {journeyId: [days]}.
+/// - gita_completed_journeys: completedJourneyIds for completion state on Home.
+///
+/// TODO(cloud-sync): Keep these keys as the local cache contract if accounts
+/// are introduced later.
+/// ------------------------------------------------------------
+library;
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/gita_data.dart';
+import 'personalization_service.dart';
 
 class LocalSavedVerse {
   const LocalSavedVerse({
@@ -480,6 +512,7 @@ class LocalStorageService {
       ...verses.where((saved) => saved.verseId != verse.id),
     ];
     await _saveJsonList(savedVersesKey, updated.map((item) => item.toJson()));
+    await PersonalizationService.recordVerseSaved(verse);
   }
 
   static Future<void> removeSavedVerse(String verseId) async {
@@ -534,6 +567,7 @@ class LocalStorageService {
       savedReflectionsKey,
       updated.map((item) => item.toJson()),
     );
+    await PersonalizationService.recordThemes(verse.allTags, weight: 2);
   }
 
   static Future<void> removeSavedReflection(String verseId) async {
@@ -621,6 +655,7 @@ class LocalStorageService {
       updated.map((item) => item.toJson()),
     );
     await recordJournalReflection();
+    await PersonalizationService.recordJournalActivity(entry.searchableText);
   }
 
   static Future<void> deleteJournalEntry(String id) async {
@@ -687,6 +722,7 @@ class LocalStorageService {
       ].take(3);
       await _saveJsonList(
           recentVersesKey, updated.map((item) => item.toJson()));
+      await PersonalizationService.recordVerseOpened(verse);
     } catch (error, stackTrace) {
       debugPrint('Recent verse save failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -725,6 +761,7 @@ class LocalStorageService {
       return;
     }
     await _recordReflectedItem(LocalReflectedItem.fromTopic(topic));
+    await PersonalizationService.recordEmotionalSearch(topic);
   }
 
   static Future<void> _recordReflectedItem(LocalReflectedItem item) async {
@@ -850,6 +887,7 @@ class LocalStorageService {
     await prefs.remove(completedPracticeDatesKey);
     await prefs.remove(recentReflectionsKey);
     await prefs.remove(themeModeKey);
+    await PersonalizationService.clearLocalPersonalization();
     debugPrint('Journey progress saved: cleared');
     journeyProgressRevision.value += 1;
   }
@@ -939,10 +977,11 @@ class LocalStorageService {
     }
   }
 
-  static Future<Map<String, Set<int>>> readingPlanProgress() async {
+  static Future<Map<String, Set<int>>> journeyProgress() async {
     // Journey progress:
-    // The old method name remains for backwards compatibility with existing
-    // installs, but the user-facing feature is now consistently "Journeys".
+    // Each map entry is journeyId -> completed day numbers. The key name still
+    // contains "reading_plan" for backwards compatibility with existing
+    // installs, but every code path now treats this data as Journeys.
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(journeyProgressKey);
@@ -973,17 +1012,9 @@ class LocalStorageService {
     }
   }
 
-  static Future<Set<int>> completedReadingPlanDays(String planId) async {
-    final progress = await readingPlanProgress();
-    return progress[planId] ?? <int>{};
-  }
-
-  static Future<Map<String, Set<int>>> journeyProgress() {
-    return readingPlanProgress();
-  }
-
-  static Future<Set<int>> completedJourneyDays(String journeyId) {
-    return completedReadingPlanDays(journeyId);
+  static Future<Set<int>> completedJourneyDays(String journeyId) async {
+    final progress = await journeyProgress();
+    return progress[journeyId] ?? <int>{};
   }
 
   static Future<Set<String>> completedJourneyIds() async {
@@ -1061,7 +1092,7 @@ class LocalStorageService {
   static Future<void> startJourney(String journeyId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final progress = await readingPlanProgress();
+      final progress = await journeyProgress();
       progress.remove(journeyId);
       final json = progress.map(
         (key, value) => MapEntry(key, value.toList()..sort()),
@@ -1096,22 +1127,22 @@ class LocalStorageService {
     }
   }
 
-  static Future<void> setReadingPlanDayComplete({
-    required String planId,
+  static Future<void> setJourneyDayComplete({
+    required String journeyId,
     required int day,
     required bool complete,
     int? totalDays,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final progress = await readingPlanProgress();
-      final completedDays = {...(progress[planId] ?? <int>{})};
+      final progress = await journeyProgress();
+      final completedDays = {...(progress[journeyId] ?? <int>{})};
       if (complete) {
         completedDays.add(day);
       } else {
         completedDays.remove(day);
       }
-      progress[planId] = completedDays;
+      progress[journeyId] = completedDays;
       final json = progress.map(
         (key, value) => MapEntry(key, value.toList()..sort()),
       );
@@ -1120,11 +1151,12 @@ class LocalStorageService {
       if (totalDays != null) {
         final completedIds = await completedJourneyIds();
         if (complete && completedDays.length >= totalDays) {
-          completedIds.add(planId);
-          debugPrint('Journey completion saved: $planId');
+          completedIds.add(journeyId);
+          debugPrint('Journey completion saved: $journeyId');
+          await PersonalizationService.recordJourneyCompleted(journeyId);
         } else {
-          completedIds.remove(planId);
-          debugPrint('Journey completion saved: removed $planId');
+          completedIds.remove(journeyId);
+          debugPrint('Journey completion saved: removed $journeyId');
         }
         final sortedIds = completedIds.toList()..sort();
         await prefs.setStringList(completedJourneysKey, sortedIds);
@@ -1135,20 +1167,6 @@ class LocalStorageService {
       debugPrintStack(stackTrace: stackTrace);
       rethrow;
     }
-  }
-
-  static Future<void> setJourneyDayComplete({
-    required String journeyId,
-    required int day,
-    required bool complete,
-    int? totalDays,
-  }) {
-    return setReadingPlanDayComplete(
-      planId: journeyId,
-      day: day,
-      complete: complete,
-      totalDays: totalDays,
-    );
   }
 
   static Future<void> _saveJsonList(

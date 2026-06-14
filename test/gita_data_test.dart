@@ -81,6 +81,32 @@ void main() {
     }
   });
 
+  test('scripture translations preserve Gita imagery and source wording',
+      () async {
+    final bundle = await GitaRepository.load();
+    final karmaYoga = bundle.verseById('2.47')!.englishTranslation;
+    final practiceVerse = bundle.verseById('12.9')!.englishTranslation;
+    final battleVerse = bundle.verseById('11.34')!.englishTranslation;
+    final chariotVerse = bundle.verseById('1.24')!.englishTranslation;
+
+    expect(karmaYoga, contains('Thy right is to work only'));
+    expect(karmaYoga, contains('fruits of action'));
+    expect(practiceVerse, contains('If thou art unable'));
+    expect(practiceVerse, contains('Yoga'));
+    expect(battleVerse, contains('warriors'));
+    expect(battleVerse, contains('battle'));
+    expect(chariotVerse.toLowerCase(), contains('chariot'));
+
+    final combined = [
+      karmaYoga,
+      practiceVerse,
+      battleVerse,
+      chariotVerse,
+    ].join(' ').toLowerCase();
+    expect(combined, isNot(contains('employee')));
+    expect(combined, isNot(contains('office')));
+  });
+
   test('GitaVerse supports translation and commentary aliases', () {
     final verse = GitaVerse.fromJson({
       'id': '1.1',
@@ -179,5 +205,56 @@ void main() {
     expect(byChapterVerse.single.verse.id, '1.1');
     expect(bySanskrit.map((result) => result.verse.id), contains('1.1'));
     expect(byTransliteration.map((result) => result.verse.id), contains('1.1'));
+  });
+
+  test('search ranking prioritizes emotional topics and interpretation',
+      () async {
+    const topicQueries = [
+      'fear',
+      'stress',
+      'anger',
+      'anxiety',
+      'attachment',
+      'discipline',
+      'purpose',
+      'devotion',
+      'focus',
+      'uncertainty',
+      'frustration',
+      'resentment',
+      'meaning',
+      'direction',
+    ];
+
+    for (final query in topicQueries) {
+      final results = await GitaRepository.search(query, limit: 6);
+      expect(results, isNotEmpty, reason: query);
+
+      final visibleRelevance = results.take(3).map((result) {
+        final verse = result.verse;
+        return [
+          verse.allTags.join(' '),
+          verse.gitaWisdomInterpretation,
+          verse.reflectionText,
+          verse.practiceToday,
+        ].join(' ').toLowerCase();
+      }).join(' ');
+
+      expect(
+        visibleRelevance,
+        anyOf([
+          contains(query),
+          contains('peace'),
+          contains('mind'),
+          contains('action'),
+          contains('duty'),
+          contains('devotion'),
+          contains('self-control'),
+          contains('focus'),
+          contains('clarity'),
+        ]),
+        reason: query,
+      );
+    }
   });
 }

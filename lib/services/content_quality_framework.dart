@@ -1,9 +1,22 @@
-// Content quality framework for Gita Wisdom.
-//
-// This is the editorial contract for practical verse notes. Scripture text
-// still comes from the local Bhagavad Gita JSON; this framework supplies
-// reviewed reflection, Practice Today, and topic-tag coverage for important
-// verses so the app feels like a wise daily companion rather than a database.
+/// ------------------------------------------------------------
+/// ContentQualityFramework
+///
+/// Purpose:
+/// Editorial contract for practical verse notes.
+///
+/// Responsibilities:
+/// - Provide reviewed Gita Wisdom Interpretation, Reflection, Practice Today,
+///   and emotional tags for important verses.
+/// - Keep app-authored content separate from scripture translation.
+/// - Support Ask Gita, Search, Verse Reader, and daily companion flows with
+///   consistent human-sounding guidance.
+///
+/// Notes:
+/// Scripture text still comes from the local Bhagavad Gita JSON. This framework
+/// supplies practical study notes so the app feels like a wise companion rather
+/// than a raw scripture database.
+/// ------------------------------------------------------------
+library;
 
 enum EmotionalIntent {
   anxiety,
@@ -77,6 +90,52 @@ class VerseContentQuality {
 
 class ContentQualityFramework {
   const ContentQualityFramework._();
+
+  // Verse Excellence Program:
+  // These are the first verses that receive full editorial review across all
+  // five content layers: scripture translation, Gita Wisdom Interpretation,
+  // Reflection, Practice Today, and emotional topic tags. Translation still
+  // comes only from local Gita JSON; this framework owns the practical
+  // interpretation and daily reflection layer around it.
+  static const verseExcellencePriorityVerseIds = [
+    '2.14',
+    '2.47',
+    '2.50',
+    '2.56',
+    '2.70',
+    '3.19',
+    '3.30',
+    '4.7',
+    '4.8',
+    '4.38',
+    '5.10',
+    '6.5',
+    '6.6',
+    '6.26',
+    '9.22',
+    '9.26',
+    '12.13',
+    '12.14',
+    '12.15',
+    '18.66',
+  ];
+
+  static const emotionalSearchTags = [
+    'peace',
+    'fear',
+    'anger',
+    'attachment',
+    'discipline',
+    'purpose',
+    'clarity',
+    'devotion',
+    'service',
+    'focus',
+    'uncertainty',
+    'self-control',
+    'compassion',
+    'gratitude',
+  ];
 
   static const topImportantVerseIds = [
     '2.7',

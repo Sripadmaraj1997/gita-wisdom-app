@@ -1,7 +1,26 @@
-// Continue Reading persistence.
-//
-// Stores the last opened verse separately from the larger LocalStorageService
-// payloads so Home can quickly restore the user's place at startup.
+/// ------------------------------------------------------------
+/// ReadingProgressService
+///
+/// Purpose:
+/// Fast local persistence for Home's Continue Reading card.
+///
+/// Responsibilities:
+/// - Save the last opened verse ID, chapter, verse number, and timestamp.
+/// - Restore the user's reading place without loading larger saved collections.
+/// - Clear progress when local data is reset.
+///
+/// SharedPreferences keys:
+/// - reading_progress_verse_id: exact verse ID, e.g. "2.47".
+/// - reading_progress_chapter_number: chapter number for fallback display.
+/// - reading_progress_verse_number: verse number for fallback display.
+/// - reading_progress_saved_at: timestamp used only for local continuity.
+///
+/// Notes:
+/// Continue Reading is intentionally separate from saved verses. Reading a verse
+/// should update continuity without implying the user saved it.
+/// ------------------------------------------------------------
+library;
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

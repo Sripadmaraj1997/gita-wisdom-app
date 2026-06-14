@@ -1,14 +1,32 @@
-// Retrieval-based Ask Gita Lite service.
-//
-// Converts a user's question into a calm, six-part devotional answer using
-// local topic profiles and the bundled Bhagavad Gita JSON. The service avoids
-// OpenAI/API dependency in this MVP so answers remain deterministic, private,
-// offline-capable, and grounded in verified local scripture translations.
-//
-// TODO(stronger-content-review): Expand these topic profiles through a formal
-// editorial review pass before adding more sensitive guidance categories.
+/// ------------------------------------------------------------
+/// AskGitaLiteService
+///
+/// Purpose:
+/// Convert user concerns into calm, local, six-part spiritual guidance.
+///
+/// Responsibilities:
+/// - Map questions to transparent emotional topic profiles.
+/// - Choose a relevant local Bhagavad Gita verse.
+/// - Return Guidance, Verse, Meaning, Reflection, Practice Today, and Source.
+/// - Use local personalization themes only as a gentle relevance signal.
+///
+/// Architecture:
+/// This service avoids OpenAI/API calls so answers remain deterministic,
+/// private, offline-capable, and reviewable.
+///
+/// Notes:
+/// The goal is practical wisdom, not chatbot conversation. Topic profiles make
+/// tone and verse selection auditable, and local search prevents empty answers
+/// without inventing scripture.
+///
+/// TODO(personalization-engine): Keep personalization local and reviewed before
+/// expanding guidance topic inference.
+/// ------------------------------------------------------------
+library;
+
 import '../data/gita_data.dart';
 import 'content_quality_framework.dart';
+import 'personalization_service.dart';
 
 class AskGitaLiteAnswer {
   // The UI renders these fields in order as the required six-part response:
@@ -41,7 +59,9 @@ class AskGitaLiteService {
     // The profile supplies human-written guidance, reflection, and practice
     // text. Verse text still comes from the local scripture dataset.
     final profile = _profileFor(question);
-    final verse = await _bestVerse(profile, question);
+    await PersonalizationService.recordAskGitaTopic(profile.topic);
+    final userProfile = await PersonalizationService.interestProfile();
+    final verse = await _bestVerse(profile, question, userProfile.topThemes);
     return AskGitaLiteAnswer(
       topic: profile.topic,
       gentleGuidance: _guidanceFor(profile, question),
@@ -55,6 +75,7 @@ class AskGitaLiteService {
   static Future<GitaVerseData> _bestVerse(
     _AskTopicProfile profile,
     String question,
+    List<String> localThemes,
   ) async {
     // Verse selection:
     // Prefer curated verse IDs for each topic. If the dataset is missing one,
@@ -68,7 +89,7 @@ class AskGitaLiteService {
     }
 
     final matches = await GitaRepository.search(
-      '${profile.searchTerms} $question',
+      '${profile.searchTerms} ${localThemes.join(' ')} $question',
       limit: 5,
     );
     for (final match in matches) {
@@ -89,8 +110,7 @@ class AskGitaLiteService {
     if (hasAny(['anger', 'angry', 'rage', 'resent', 'irritat'])) {
       return _profiles['anger']!;
     }
-    if (hasAny(
-        ['work', 'job', 'deadline', 'pressure', 'burnout', 'overwhelmed'])) {
+    if (hasAny(['work', 'job', 'deadline', 'pressure', 'burnout'])) {
       return _profiles['work']!;
     }
     if (hasAny([
@@ -101,6 +121,7 @@ class AskGitaLiteService {
       'worries',
       'worrying',
       'overthinking',
+      'overwhelmed',
       'stress',
       'stressed',
     ])) {
@@ -118,6 +139,9 @@ class AskGitaLiteService {
       'confused',
       'confusion',
       'decision',
+      'feel lost',
+      'feeling lost',
+      'lost in life',
     ])) {
       return _profiles['uncertainty']!;
     }
@@ -176,6 +200,9 @@ class AskGitaLiteService {
       if (lower.contains('stop worrying')) {
         return 'Worry loses strength when it is met one clear moment at a time.';
       }
+      if (lower.contains('overwhelmed')) {
+        return 'When everything feels too much, make the moment smaller.';
+      }
       if (normalized == 'i am anxious') {
         return 'Anxiety can make even this moment feel crowded.';
       }
@@ -186,6 +213,14 @@ class AskGitaLiteService {
         return 'Your future does not need to be solved all at once.';
       }
     }
+    if (profile.topic == 'uncertainty') {
+      if (lower.contains('feel lost') || lower.contains('feeling lost')) {
+        return 'Feeling lost does not mean you have failed; it means you need one steady step.';
+      }
+      if (lower.contains('uncertain')) {
+        return 'Uncertainty can be met without forcing an answer too soon.';
+      }
+    }
     if (profile.topic == 'purpose' && lower.contains('confused')) {
       return 'Confusion about purpose does not mean you are off the path.';
     }
@@ -193,6 +228,9 @@ class AskGitaLiteService {
       return 'Anger can feel powerful, but power is not the same as truth.';
     }
     if (profile.topic == 'fear' && lower.contains('failure')) {
+      if (normalized == 'i fear failure') {
+        return 'Failure is not a verdict on your worth; it is one possible result.';
+      }
       return 'Fear of failure is heavy because it ties your worth to one result.';
     }
     if (profile.topic == 'grief') {
@@ -210,6 +248,9 @@ class AskGitaLiteService {
     }
     if (profile.topic == 'discipline' && lower.contains('consistency')) {
       return 'Consistency grows from small promises kept without harshness.';
+    }
+    if (profile.topic == 'discipline' && lower.contains('cannot focus')) {
+      return 'When focus is scattered, begin with one small point of attention.';
     }
     if (profile.topic == 'devotion') {
       return 'Devotion can be practiced quietly before it is felt deeply.';

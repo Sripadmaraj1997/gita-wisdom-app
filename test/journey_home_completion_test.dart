@@ -149,7 +149,7 @@ void main() {
 
     expect(find.text('Journey to Peace'), findsWidgets);
     expect(find.text('You completed Journey to Peace.'), findsWidgets);
-    expect(find.text('Choose Next Journey'), findsOneWidget);
+    expect(find.text('Start Next Journey'), findsOneWidget);
   });
 
   testWidgets('Home updates and persists completed Journey to Peace', (
@@ -186,7 +186,7 @@ void main() {
 
     expect(find.text('You completed Journey to Peace.'), findsWidgets);
     expect(find.text('7 of 7 days complete'), findsOneWidget);
-    expect(find.text('Choose Next Journey'), findsOneWidget);
+    expect(find.text('Start Next Journey'), findsOneWidget);
     expect(
       find.text('What insight will you carry forward?'),
       findsOneWidget,
@@ -312,9 +312,9 @@ void main() {
     await pumpHome(tester);
     await pumpUntilFound(tester, find.text('You completed Journey to Peace.'));
 
-    await tester.ensureVisible(find.text('Choose Next Journey'));
+    await tester.ensureVisible(find.text('Start Next Journey'));
     await tester.pump();
-    await tester.tap(find.text('Choose Next Journey'));
+    await tester.tap(find.text('Start Next Journey'));
     await tester.pumpAndSettle();
 
     expect(find.text('Choose Your Next Journey'), findsOneWidget);
