@@ -19,6 +19,12 @@
 /// 5. Practice Today
 /// 6. Translation
 ///
+/// Emotional discovery:
+/// Queries such as fear, peace, anger, discipline, purpose, attachment,
+/// devotion, clarity, and compassion should find applicable wisdom even when
+/// the exact word is not prominent in a translation. Ranking still preserves
+/// exact verse lookup so "2.47" behaves predictably.
+///
 /// Notes:
 /// Emotional search is meant to feel spiritually aware without cloud search or
 /// AI. GitaRepository owns ranking so this screen stays focused on UX state.
@@ -118,8 +124,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
         children: [
           const PageHeader(
             title: 'Search',
-            subtitle:
-                'Search Sanskrit, translation, reflection, practice, or topic',
+            subtitle: 'Find a verse for what you are carrying',
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 36),
@@ -137,7 +142,6 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                         const IconMedallion(
                           icon: Icons.search_rounded,
                           size: 40,
-                          backgroundColor: kGold,
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -147,7 +151,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                             style: gitaBody(color: kDarkText, size: 16),
                             onChanged: _onQueryChanged,
                             decoration: InputDecoration(
-                              hintText: 'Search peace, karma, 2.47, आत्मा...',
+                              hintText: 'Search fear, peace, purpose, 2.47...',
                               hintStyle: gitaBody(
                                 color: kDarkText.withValues(alpha: 0.56),
                                 size: 14,
@@ -241,7 +245,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                           icon: Icons.search_off_rounded,
                           title: 'No matching verse surfaced yet.',
                           body:
-                              'Peace often begins with a single verse. Try peace, duty, fear, attachment, or purpose.',
+                              'Try the feeling beneath the question: fear, peace, attachment, anger, or purpose.',
                         );
                       }
                       return Column(
@@ -252,8 +256,8 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                               Expanded(
                                 child: Text(
                                   _query.isEmpty
-                                      ? 'Suggested verses'
-                                      : '${results.length} results',
+                                      ? 'Verses for reflection'
+                                      : '${results.length} verses surfaced',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: gitaBody(
@@ -264,7 +268,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const AccentPill('Real Gita data'),
+                              const AccentPill('Local wisdom'),
                             ],
                           ),
                           const SizedBox(height: 16),
@@ -311,7 +315,10 @@ class _SearchResultCard extends StatelessWidget {
     return PremiumCard(
       onTap: () => context.push(Uri(
         path: '/verseReaderPage',
-        queryParameters: {'verseId': verse.id},
+        queryParameters: {
+          'verseId': verse.id,
+          'source': 'search',
+        },
       ).toString()),
       padding: const EdgeInsets.all(22),
       child: Column(
@@ -369,8 +376,19 @@ class _SearchResultCard extends StatelessWidget {
                     maxLines: 3,
                   ),
                 ],
-                if (verse.gitaWisdomInterpretation.trim().isNotEmpty) ...[
+                if ((verse.enrichment?.meaning.trim() ?? '').isNotEmpty) ...[
                   if (verse.englishTranslation.trim().isNotEmpty)
+                    const SizedBox(height: 12),
+                  _PreviewBlock(
+                    label: 'Meaning',
+                    text: verse.enrichment!.meaning,
+                    query: query,
+                    maxLines: 3,
+                  ),
+                ],
+                if (verse.gitaWisdomInterpretation.trim().isNotEmpty) ...[
+                  if (verse.englishTranslation.trim().isNotEmpty ||
+                      (verse.enrichment?.meaning.trim() ?? '').isNotEmpty)
                     const SizedBox(height: 12),
                   _PreviewBlock(
                     label: 'Gita Wisdom Interpretation',
@@ -381,6 +399,7 @@ class _SearchResultCard extends StatelessWidget {
                 ],
                 if (verse.reflectionText.trim().isNotEmpty) ...[
                   if (verse.englishTranslation.trim().isNotEmpty ||
+                      (verse.enrichment?.meaning.trim() ?? '').isNotEmpty ||
                       verse.gitaWisdomInterpretation.trim().isNotEmpty)
                     const SizedBox(height: 12),
                   _PreviewBlock(
@@ -392,6 +411,7 @@ class _SearchResultCard extends StatelessWidget {
                 ],
                 if (verse.practiceToday.trim().isNotEmpty) ...[
                   if (verse.englishTranslation.trim().isNotEmpty ||
+                      (verse.enrichment?.meaning.trim() ?? '').isNotEmpty ||
                       verse.gitaWisdomInterpretation.trim().isNotEmpty ||
                       verse.reflectionText.trim().isNotEmpty)
                     const SizedBox(height: 12),
@@ -481,12 +501,12 @@ class _TopicSearchChips extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Search by feeling or topic',
+            'Search by feeling',
             style: gitaBody(color: kText, weight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           Text(
-            'Begin with what you are carrying today.',
+            'Begin with the emotion, question, or burden on your mind.',
             style: gitaBody(color: kMuted, size: 13),
           ),
           const SizedBox(height: 12),
@@ -533,14 +553,14 @@ class _TopicChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
             color: selected
-                ? kGold.withValues(alpha: 0.45)
+                ? kSoftGold.withValues(alpha: 0.36)
                 : kLine.withValues(alpha: 0.8),
           ),
         ),
         child: Text(
           label,
           style: gitaBody(
-            color: selected ? kSoftGold : kText,
+            color: kText,
             size: 12,
             weight: FontWeight.w900,
           ),
@@ -598,7 +618,7 @@ class _HighlightedSnippet extends StatelessWidget {
         style: style.copyWith(
           color: kDarkText,
           fontWeight: FontWeight.w900,
-          backgroundColor: kGold.withValues(alpha: 0.28),
+          backgroundColor: kSoftGold.withValues(alpha: 0.18),
         ),
       ));
       cursor = match.end;

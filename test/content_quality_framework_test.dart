@@ -43,7 +43,7 @@ void main() {
     'placeholder',
   ];
   final archaicLanguagePattern = RegExp(
-    r'\b(thy|thee|thou|hath|dost|shalt|whence|thereof)\b',
+    r'\b(thy|thee|thou|hath|dost|shalt|ye|whence|wherefore|thereof|thine)\b',
     caseSensitive: false,
   );
 
@@ -93,6 +93,29 @@ void main() {
     expect(content.reflection.intent, EmotionalIntent.attachment);
     expect(content.practiceToday.category, EmotionalIntent.attachment);
     expect(content.gitaWisdomInterpretation, isNotEmpty);
+  });
+
+  test('verse enrichment progress covers top 100 without duplicates', () async {
+    final bundle = await GitaRepository.load();
+
+    expect(ContentQualityFramework.topImportantVerseIds, hasLength(100));
+    expect(ContentQualityFramework.enrichedVerseCount, 100);
+    expect(ContentQualityFramework.duplicateVerseEnrichmentIds(), isEmpty);
+
+    final missingOrIncomplete = <String>[];
+    for (final verseId in ContentQualityFramework.topImportantVerseIds) {
+      final enrichment = bundle.verseById(verseId)?.enrichment;
+      if (enrichment == null || !enrichment.isComplete) {
+        missingOrIncomplete.add(verseId);
+        continue;
+      }
+      expect(enrichment.toJson(),
+          containsPair('chapterNumber', int.parse(verseId.split('.').first)));
+      expect(enrichment.toJson(),
+          containsPair('verseNumber', int.parse(verseId.split('.').last)));
+    }
+    expect(missingOrIncomplete, isEmpty);
+    expect(bundle.enrichedVerseCount, 100);
   });
 
   test('curated priority verses have reviewed interpretation and topic tags',

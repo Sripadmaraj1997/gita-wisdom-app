@@ -56,20 +56,24 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
     // static Gita bundle. Missing IDs are ignored gracefully.
     final saved = await LocalStorageService.savedVerses();
     final savedReflections = await LocalStorageService.savedReflections();
+    final journalEntries = await LocalStorageService.journalEntries();
     final highlightIds = await LocalStorageService.highlightedVerseIds();
-    final bundle = await GitaDataService.load();
-    final highlighted = highlightIds
-        .map(bundle.verseById)
-        .whereType<GitaVerseData>()
-        .toList()
-      ..sort((a, b) {
+    final highlighted = <GitaVerseData>[];
+    if (highlightIds.isNotEmpty) {
+      final bundle = await GitaDataService.load();
+      highlighted.addAll(
+        highlightIds.map(bundle.verseById).whereType<GitaVerseData>(),
+      );
+      highlighted.sort((a, b) {
         final chapter = a.chapterNumber.compareTo(b.chapterNumber);
         return chapter == 0 ? a.verseNumber.compareTo(b.verseNumber) : chapter;
       });
+    }
     return _SavedLibraryData(
       saved: saved,
       highlighted: highlighted,
       reflections: savedReflections,
+      journalEntries: journalEntries,
     );
   }
 
@@ -83,7 +87,7 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
         children: [
           const PageHeader(
             title: 'Saved Wisdom',
-            subtitle: 'Private verses and reflections to return to',
+            subtitle: 'Return to the verses and reflections you want to live',
             showBack: true,
             trailing: Icon(Icons.bookmark_rounded, color: kGold),
           ),
@@ -109,24 +113,41 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
                 final data = snapshot.data ?? const _SavedLibraryData.empty();
                 if (data.saved.isEmpty &&
                     data.highlighted.isEmpty &&
-                    data.reflections.isEmpty) {
+                    data.reflections.isEmpty &&
+                    data.journalEntries.isEmpty) {
                   return const _SavedVersesEmptyState(
-                    title: 'No saved wisdom yet.',
+                    title: 'Your wisdom collection is empty.',
                     body:
-                        'Peace often begins with a single verse. Save wisdom you want to return to.',
+                        'Save one verse or reflection when it gives you an insight, an action, or a reason to return.',
                   );
                 }
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SavedLibraryTabs(
-                      selectedIndex: _selectedTab,
-                      onSelected: (index) =>
-                          setState(() => _selectedTab = index),
-                    ),
+                    Builder(builder: (context) {
+                      final hasVerseContent =
+                          data.saved.isNotEmpty || data.highlighted.isNotEmpty;
+                      final hasReflectionContent =
+                          data.reflections.isNotEmpty ||
+                              data.journalEntries.isNotEmpty;
+                      final selectedTab =
+                          !hasVerseContent && hasReflectionContent
+                              ? 1
+                              : _selectedTab;
+                      return _SavedLibraryTabs(
+                        selectedIndex: selectedTab,
+                        onSelected: (index) =>
+                            setState(() => _selectedTab = index),
+                      );
+                    }),
                     const SizedBox(height: 18),
-                    if (_selectedTab == 0)
+                    if ((data.saved.isEmpty &&
+                            data.highlighted.isEmpty &&
+                            (data.reflections.isNotEmpty ||
+                                data.journalEntries.isNotEmpty))
+                        ? false
+                        : _selectedTab == 0)
                       _SavedVersesList(
                         saved: data.saved,
                         highlighted: data.highlighted,
@@ -135,6 +156,7 @@ class _SavedVersesPageWidgetState extends State<SavedVersesPageWidget> {
                     else
                       _SavedReflectionsList(
                         reflections: data.reflections,
+                        journalEntries: data.journalEntries,
                         onRemoved: () => setState(_refresh),
                       ),
                   ],
@@ -153,16 +175,19 @@ class _SavedLibraryData {
     required this.saved,
     required this.highlighted,
     required this.reflections,
+    required this.journalEntries,
   });
 
   const _SavedLibraryData.empty()
       : saved = const [],
         highlighted = const [],
-        reflections = const [];
+        reflections = const [],
+        journalEntries = const [];
 
   final List<LocalSavedVerse> saved;
   final List<GitaVerseData> highlighted;
   final List<LocalSavedReflection> reflections;
+  final List<LocalJournalEntry> journalEntries;
 }
 
 class _SavedLibraryTabs extends StatelessWidget {
@@ -231,14 +256,14 @@ class _SavedLibraryTab extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: selected
-                ? kGold.withValues(alpha: 0.45)
+                ? kSoftGold.withValues(alpha: 0.34)
                 : kLine.withValues(alpha: 0.7),
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: selected ? kSoftGold : kText, size: 17),
+            Icon(icon, color: kText, size: 17),
             const SizedBox(width: 7),
             Flexible(
               child: Text(
@@ -246,7 +271,7 @@ class _SavedLibraryTab extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: gitaBody(
-                  color: selected ? kSoftGold : kText,
+                  color: kText,
                   size: 12,
                   weight: FontWeight.w900,
                 ),
@@ -275,7 +300,8 @@ class _SavedVersesList extends StatelessWidget {
     if (saved.isEmpty && highlighted.isEmpty) {
       return const _SavedVersesEmptyState(
         title: 'No saved verses yet.',
-        body: 'Begin with one verse that steadies your heart.',
+        body:
+            'When a verse steadies you, save it here and return to practice it again.',
       );
     }
 
@@ -284,8 +310,8 @@ class _SavedVersesList extends StatelessWidget {
       children: [
         if (highlighted.isNotEmpty) ...[
           const _SavedSectionHeader(
-            icon: Icons.auto_awesome_rounded,
-            title: 'My Highlights',
+            icon: Icons.edit_note_rounded,
+            title: 'Verses to Revisit',
           ),
           const SizedBox(height: 12),
           for (var i = 0; i < highlighted.length; i++) ...[
@@ -302,7 +328,7 @@ class _SavedVersesList extends StatelessWidget {
         if (saved.isNotEmpty) ...[
           const _SavedSectionHeader(
             icon: Icons.bookmark_rounded,
-            title: 'Saved Wisdom',
+            title: 'Verses to Practice',
           ),
           const SizedBox(height: 18),
           for (var i = 0; i < saved.length; i++) ...[
@@ -324,39 +350,166 @@ class _SavedVersesList extends StatelessWidget {
 class _SavedReflectionsList extends StatelessWidget {
   const _SavedReflectionsList({
     required this.reflections,
+    required this.journalEntries,
     required this.onRemoved,
   });
 
   final List<LocalSavedReflection> reflections;
+  final List<LocalJournalEntry> journalEntries;
   final VoidCallback onRemoved;
 
   @override
   Widget build(BuildContext context) {
-    if (reflections.isEmpty) {
+    if (reflections.isEmpty && journalEntries.isEmpty) {
       return const _SavedVersesEmptyState(
         title: 'No saved reflections yet.',
-        body: 'Begin your reflection journey with one note worth carrying.',
+        body:
+            'Save reflections that help you understand yourself and choose one wiser action.',
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SavedSectionHeader(
-          icon: Icons.lightbulb_outline_rounded,
-          title: 'Saved Reflections',
-        ),
-        const SizedBox(height: 18),
-        for (var i = 0; i < reflections.length; i++) ...[
-          AnimatedEntrance(
-            delay: Duration(milliseconds: 30 * i),
-            child: _SavedReflectionCard(
-              reflection: reflections[i],
-              onRemoved: onRemoved,
-            ),
+        if (journalEntries.isNotEmpty) ...[
+          const _SavedSectionHeader(
+            icon: Icons.edit_note_rounded,
+            title: 'Journal Reflections',
           ),
           const SizedBox(height: 18),
+          for (var i = 0; i < journalEntries.length; i++) ...[
+            AnimatedEntrance(
+              delay: Duration(milliseconds: 30 * i),
+              child: _SavedJournalEntryCard(entry: journalEntries[i]),
+            ),
+            const SizedBox(height: 18),
+          ],
         ],
+        if (reflections.isNotEmpty) ...[
+          const _SavedSectionHeader(
+            icon: Icons.lightbulb_outline_rounded,
+            title: 'Verse Reflections',
+          ),
+          const SizedBox(height: 18),
+          for (var i = 0; i < reflections.length; i++) ...[
+            AnimatedEntrance(
+              delay: Duration(milliseconds: 30 * i),
+              child: _SavedReflectionCard(
+                reflection: reflections[i],
+                onRemoved: onRemoved,
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _SavedJournalEntryCard extends StatelessWidget {
+  const _SavedJournalEntryCard({required this.entry});
+
+  final LocalJournalEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return PremiumCard(
+      accent: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AccentPill(entry.formattedDate),
+              if (entry.linkedVerse.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Flexible(child: AccentPill(entry.linkedVerse)),
+              ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            entry.title,
+            style: gitaBody(color: kText, size: 16, weight: FontWeight.w900),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: kCream,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: kGold.withValues(alpha: 0.18)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (entry.text.trim().isNotEmpty)
+                  Text(
+                    entry.text,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: gitaBody(color: kDarkText, size: 14)
+                        .copyWith(height: 1.5),
+                  ),
+                if (entry.intention.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _SavedJournalLine(label: 'Intention', text: entry.intention),
+                ],
+                if (entry.gratitude.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _SavedJournalLine(label: 'Gratitude', text: entry.gratitude),
+                ],
+                if (entry.actionStep.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _SavedJournalLine(
+                    label: 'Practice Today',
+                    text: entry.actionStep,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavedJournalLine extends StatelessWidget {
+  const _SavedJournalLine({
+    required this.label,
+    required this.text,
+  });
+
+  final String label;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: gitaBody(
+            color: kRoyalPurple,
+            size: 11,
+            weight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          text,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: gitaBody(
+            color: kDarkText,
+            size: 14,
+            weight: FontWeight.w800,
+          ).copyWith(height: 1.5),
+        ),
       ],
     );
   }
@@ -375,7 +528,7 @@ class _SavedSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: kSoftGold, size: 18),
+        Icon(icon, color: kMuted, size: 18),
         const SizedBox(width: 8),
         Text(
           title,
@@ -402,21 +555,24 @@ class _HighlightedVerseCard extends StatelessWidget {
       accent: true,
       onTap: () => context.push(Uri(
         path: '/verseReaderPage',
-        queryParameters: {'verseId': verse.id},
+        queryParameters: {
+          'verseId': verse.id,
+          'source': 'savedWisdom',
+        },
       ).toString()),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const AccentPill('Highlighted'),
+              const AccentPill('Marked'),
               const SizedBox(width: 8),
               AccentPill(verse.shortReference),
               const Spacer(),
               IconButton(
-                tooltip: 'Remove highlight',
+                tooltip: 'Remove mark',
                 onPressed: () => _removeHighlight(context),
-                icon: const Icon(Icons.auto_awesome_rounded, color: kSoftGold),
+                icon: const Icon(Icons.edit_note_rounded, color: kMuted),
               ),
             ],
           ),
@@ -461,7 +617,7 @@ class _HighlightedVerseCard extends StatelessWidget {
       onRemoved();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Highlight removed.')),
+          const SnackBar(content: Text('Mark removed.')),
         );
       }
     } catch (error, stackTrace) {
@@ -469,7 +625,7 @@ class _HighlightedVerseCard extends StatelessWidget {
       debugPrintStack(stackTrace: stackTrace);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not remove highlight.')),
+          const SnackBar(content: Text('Could not remove this mark.')),
         );
       }
     }
@@ -491,7 +647,10 @@ class _SavedVerseCard extends StatelessWidget {
       accent: true,
       onTap: () => context.push(Uri(
         path: '/verseReaderPage',
-        queryParameters: {'verseId': verse.verseId},
+        queryParameters: {
+          'verseId': verse.verseId,
+          'source': 'savedWisdom',
+        },
       ).toString()),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,7 +662,7 @@ class _SavedVerseCard extends StatelessWidget {
               IconButton(
                 tooltip: 'Remove saved verse',
                 onPressed: () => _removeSavedVerse(context),
-                icon: const Icon(Icons.bookmark_remove_rounded, color: kGold),
+                icon: const Icon(Icons.bookmark_remove_rounded, color: kMuted),
               ),
             ],
           ),
@@ -542,7 +701,7 @@ class _SavedVerseCard extends StatelessWidget {
       onRemoved();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verse removed from saved.')),
+          const SnackBar(content: Text('Verse released from Saved Wisdom.')),
         );
       }
     } catch (error, stackTrace) {
@@ -550,7 +709,7 @@ class _SavedVerseCard extends StatelessWidget {
       debugPrintStack(stackTrace: stackTrace);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not remove saved verse.')),
+          const SnackBar(content: Text('Could not release this verse.')),
         );
       }
     }
@@ -572,7 +731,10 @@ class _SavedReflectionCard extends StatelessWidget {
       accent: true,
       onTap: () => context.push(Uri(
         path: '/verseReaderPage',
-        queryParameters: {'verseId': reflection.verseId},
+        queryParameters: {
+          'verseId': reflection.verseId,
+          'source': 'savedWisdom',
+        },
       ).toString()),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -582,9 +744,9 @@ class _SavedReflectionCard extends StatelessWidget {
               AccentPill(reflection.verseReference),
               const Spacer(),
               IconButton(
-                tooltip: 'Remove saved reflection',
+                tooltip: 'Remove reflection',
                 onPressed: () => _removeSavedReflection(context),
-                icon: const Icon(Icons.delete_outline_rounded, color: kGold),
+                icon: const Icon(Icons.close_rounded, color: kMuted),
               ),
             ],
           ),
@@ -662,7 +824,7 @@ class _SavedReflectionCard extends StatelessWidget {
       onRemoved();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reflection removed.')),
+          const SnackBar(content: Text('Reflection released.')),
         );
       }
     } catch (error, stackTrace) {
@@ -670,7 +832,7 @@ class _SavedReflectionCard extends StatelessWidget {
       debugPrintStack(stackTrace: stackTrace);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not remove reflection.')),
+          const SnackBar(content: Text('Could not release this reflection.')),
         );
       }
     }

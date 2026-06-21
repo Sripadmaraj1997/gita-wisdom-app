@@ -28,6 +28,7 @@ const _midnightNavy = Color(0xFF061A2E);
 const _illuminatedGold = Color(0xFFD4AF37);
 const _softGold = Color(0xFFE6C76A);
 const _warmGoldGlow = Color(0xFFF4E7B2);
+const _softCream = Color(0xFFFFF4DC);
 const _lightText = Color(0xFFFFF7E8);
 
 void _splashDebugLog(String message) {
@@ -205,14 +206,14 @@ class _KrishnaSplashImage extends StatelessWidget {
             decoration: BoxDecoration(
               boxShadow: [
                 BoxShadow(
-                  color: _warmGoldGlow.withValues(alpha: 0.12 * glow),
-                  blurRadius: 82 * glow,
-                  spreadRadius: 26 * glow,
+                  color: _warmGoldGlow.withValues(alpha: 0.06 * glow),
+                  blurRadius: 54 * glow,
+                  spreadRadius: 12 * glow,
                 ),
                 BoxShadow(
-                  color: _illuminatedGold.withValues(alpha: 0.16 * glow),
-                  blurRadius: 58 * glow,
-                  spreadRadius: 11 * glow,
+                  color: _illuminatedGold.withValues(alpha: 0.07 * glow),
+                  blurRadius: 38 * glow,
+                  spreadRadius: 4 * glow,
                 ),
                 BoxShadow(
                   color: _midnightNavy.withValues(alpha: 0.62),
@@ -263,7 +264,7 @@ class _ReadabilityOverlay extends StatelessWidget {
             center: const Alignment(0, -0.18),
             radius: 0.82,
             colors: [
-              _illuminatedGold.withValues(alpha: 0.18),
+              _illuminatedGold.withValues(alpha: 0.08),
               Colors.transparent,
             ],
           ),
@@ -287,7 +288,7 @@ class _SplashTitle extends StatelessWidget {
           'Gita Wisdom',
           textAlign: TextAlign.center,
           style: gitaTitle(titleSize).copyWith(
-            color: _warmGoldGlow,
+            color: _softCream,
             height: 1.06,
             shadows: [
               Shadow(
@@ -296,15 +297,15 @@ class _SplashTitle extends StatelessWidget {
                 offset: const Offset(0, 3),
               ),
               Shadow(
-                color: _illuminatedGold.withValues(alpha: 0.28),
-                blurRadius: 22,
+                color: _illuminatedGold.withValues(alpha: 0.12),
+                blurRadius: 16,
               ),
             ],
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Timeless Wisdom. Daily Peace.',
+          'Timeless wisdom for daily steadiness.',
           textAlign: TextAlign.center,
           style: gitaBody(
             color: _lightText,
@@ -381,10 +382,10 @@ class _LoadingText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Loading divine wisdom...',
+      'Preparing your reading...',
       textAlign: TextAlign.center,
       style: gitaBody(
-        color: _softGold,
+        color: _softCream.withValues(alpha: 0.86),
         size: compact ? 12.5 : 14,
         weight: FontWeight.w800,
       ).copyWith(
@@ -412,11 +413,11 @@ class _SplashProgress extends StatelessWidget {
         decoration: BoxDecoration(
           color: _midnightNavy.withValues(alpha: 0.62),
           borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: _warmGoldGlow.withValues(alpha: 0.32)),
+          border: Border.all(color: _warmGoldGlow.withValues(alpha: 0.16)),
           boxShadow: [
             BoxShadow(
-              color: _illuminatedGold.withValues(alpha: 0.28),
-              blurRadius: 22,
+              color: _midnightNavy.withValues(alpha: 0.28),
+              blurRadius: 14,
               offset: const Offset(0, 6),
             ),
           ],
@@ -424,7 +425,7 @@ class _SplashProgress extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: LinearProgressIndicator(
           backgroundColor: Colors.transparent,
-          color: _illuminatedGold,
+          color: _softGold.withValues(alpha: 0.82),
           minHeight: 6,
           borderRadius: BorderRadius.circular(100),
         ),

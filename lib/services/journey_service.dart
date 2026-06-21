@@ -64,39 +64,39 @@ class JourneyService {
     GitaJourneySummary(
       id: 'journey_peace_7',
       title: 'Journey to Peace',
-      subtitle: '7 days for steadiness, release, and gentle trust.',
+      subtitle: 'Find calm and steadiness.',
       totalDays: 7,
     ),
     GitaJourneySummary(
       id: 'journey_discipline_14',
       title: 'Journey of Discipline',
-      subtitle: '14 days of small, steady action.',
+      subtitle: 'Build focus and consistency.',
       totalDays: 14,
     ),
     GitaJourneySummary(
       id: 'journey_karma_yoga_14',
       title: 'Journey of Karma Yoga',
-      subtitle: '14 days on action, offering, and freedom from results.',
+      subtitle: 'Act without attachment to results.',
       totalDays: 14,
     ),
     GitaJourneySummary(
       id: 'journey_anxiety_7',
       title: 'Journey Through Anxiety',
-      subtitle: '7 days for courage, grounding, and trust.',
+      subtitle: 'Move from worry to steadiness.',
       totalDays: 7,
     ),
     GitaJourneySummary(
       id: 'journey_clarity_21',
       title: 'Journey to Inner Clarity',
-      subtitle: '21 days of discernment, quiet attention, and steady seeing.',
+      subtitle: 'Develop deeper self-understanding.',
       totalDays: 21,
     ),
   ];
 
   static const recommendedAfterCompletionIds = [
     'journey_discipline_14',
-    'journey_anxiety_7',
     'journey_karma_yoga_14',
+    'journey_anxiety_7',
     'journey_clarity_21',
   ];
 

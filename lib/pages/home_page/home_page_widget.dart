@@ -17,6 +17,11 @@
 /// - DailyCompanionService and PersonalizationService for Today's Guidance.
 /// - LocalStorageService/JourneyService for local journey state.
 ///
+/// User flow:
+/// Home should help the user leave with one insight, one action, and one reason
+/// to return. Continue Reading is primary, Today's Guidance is secondary, and
+/// recommendations/journeys appear as quiet continuity rather than a dashboard.
+///
 /// Notes:
 /// Home follows a companion-first design. The screen should answer one question
 /// quickly: "What is the next sincere step I can take today?"
@@ -68,12 +73,12 @@ class HomePageWidget extends StatelessWidget {
                 const AnimatedEntrance(
                   child: _KrishnaHeroSection(),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 30),
                 // Continue Reading:
                 // Restores the last verse saved by VerseReaderScreen so a
                 // returning user can resume scripture reading immediately.
                 const _SectionHeader(
-                  title: 'Continue reading',
+                  title: 'Continue Reading',
                 ),
                 const SizedBox(height: 16),
                 FutureBuilder<_ContinueReadingData>(
@@ -100,28 +105,19 @@ class HomePageWidget extends StatelessWidget {
                         onTap: () {
                           context.push(Uri(
                             path: '/verseReaderPage',
-                            queryParameters: {'verseId': data.verse.id},
+                            queryParameters: {
+                              'verseId': data.verse.id,
+                              'source': 'continueReading',
+                            },
                           ).toString());
                         },
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 28),
-                // Read Gita / Ask Gita:
-                // The two primary paths cover direct scripture reading and
-                // retrieval-based guidance without sending user questions to an
-                // external AI/API service.
-                AnimatedEntrance(
-                  delay: const Duration(milliseconds: 65),
-                  child: _PrimaryActionCards(
-                    onRead: () => context.go('/chaptersPage'),
-                    onAsk: () => context.push('/askGitaPage'),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 // Today's Guidance:
-                // The daily companion experience stays singular: one verse
+                // Secondary daily path after Continue Reading: one verse
                 // reference, one reflection, and one practice.
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 80),
@@ -136,14 +132,17 @@ class HomePageWidget extends StatelessWidget {
                           _recordReflectedVerse(guidance.verseId);
                           context.push(Uri(
                             path: '/verseReaderPage',
-                            queryParameters: {'verseId': guidance.verseId},
+                            queryParameters: {
+                              'verseId': guidance.verseId,
+                              'source': 'todayGuidance',
+                            },
                           ).toString());
                         },
                       );
                     },
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 30),
                 // Journeys:
                 // Surfaces the active local journey after today's verse so the
                 // Home flow stays content-first: resume scripture, choose a
@@ -168,23 +167,32 @@ class HomePageWidget extends StatelessWidget {
                           delay: const Duration(milliseconds: 100),
                           child: _HomeCurrentJourneyCard(
                             current: journey,
-                            onContinue: () {
-                              if (journey.isComplete) {
-                                _showNextJourneyPicker(context);
-                                return;
-                              }
-                              _continueJourneyFromHome(context);
-                            },
+                            onContinue: () => _continueJourneyFromHome(context),
                           ),
                         );
                       },
                     );
                   },
                 ),
+                const SizedBox(height: 30),
+                // Read Gita / Ask Gita:
+                // Kept below the daily reading paths to reduce first-screen
+                // decision fatigue while preserving clear access to reading
+                // and retrieval-based guidance.
+                AnimatedEntrance(
+                  delay: const Duration(milliseconds: 130),
+                  child: _PrimaryActionCards(
+                    onRead: () => context.go('/chaptersPage'),
+                    onAsk: () => context.push('/askGitaPage'),
+                  ),
+                ),
                 _PersonalizedRecommendationSection(
                   onOpenVerse: (verseId) => context.push(Uri(
                     path: '/verseReaderPage',
-                    queryParameters: {'verseId': verseId},
+                    queryParameters: {
+                      'verseId': verseId,
+                      'source': 'dailyVerse',
+                    },
                   ).toString()),
                   onOpenJourney: (journeyId) async {
                     await LocalStorageService.startJourney(journeyId);
@@ -203,14 +211,17 @@ class HomePageWidget extends StatelessWidget {
                 _RecentlyReflectedSection(
                   onOpenVerse: (verseId) => context.push(Uri(
                     path: '/verseReaderPage',
-                    queryParameters: {'verseId': verseId},
+                    queryParameters: {
+                      'verseId': verseId,
+                      'source': 'recentReflection',
+                    },
                   ).toString()),
                   onOpenTopic: (topic) => context.go(Uri(
                     path: '/searchPage',
                     queryParameters: {'q': topic.toLowerCase()},
                   ).toString()),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 34),
                 // Secondary actions:
                 // Keeps useful Bible-app-level tools accessible while avoiding
                 // social feeds, profiles, comments, or other noisy surfaces.
@@ -259,11 +270,11 @@ class _KrishnaHeroSection extends StatelessWidget {
           stops: [0, 0.58, 1],
         ),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: kGold.withValues(alpha: 0.28)),
+        border: Border.all(color: kGold.withValues(alpha: 0.16)),
         boxShadow: [
           BoxShadow(
-            color: kGold.withValues(alpha: 0.16),
-            blurRadius: 28,
+            color: kDeepBrinjal.withValues(alpha: 0.20),
+            blurRadius: 22,
             offset: const Offset(0, 12),
           ),
         ],
@@ -288,7 +299,7 @@ class _KrishnaHeroSection extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: kAntiqueGold.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: kGold.withValues(alpha: 0.22)),
+                  border: Border.all(color: kGold.withValues(alpha: 0.14)),
                 ),
                 child: Text(
                   'Gita Wisdom',
@@ -424,11 +435,11 @@ class _TodaysGuidanceCardState extends State<_TodaysGuidanceCard> {
         decoration: BoxDecoration(
           color: kCream,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: kGold.withValues(alpha: 0.34)),
+          border: Border.all(color: kGold.withValues(alpha: 0.22)),
           boxShadow: [
             BoxShadow(
-              color: kGold.withValues(alpha: 0.12),
-              blurRadius: 28,
+              color: kDeepBrinjal.withValues(alpha: 0.10),
+              blurRadius: 22,
               offset: const Offset(0, 12),
             ),
           ],
@@ -484,6 +495,14 @@ class _TodaysGuidanceCardState extends State<_TodaysGuidanceCard> {
                 size: 16,
                 weight: FontWeight.w800,
               ).copyWith(height: 1.48),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'What will you remember from this today?',
+              style: gitaTransliteration(
+                size: 13,
+                color: kRoyalPurple.withValues(alpha: 0.76),
+              ).copyWith(height: 1.42),
             ),
             const SizedBox(height: 16),
             _PracticeTodayBox(text: guidance.practiceToday),
@@ -647,7 +666,7 @@ class _PersonalizedRecommendationSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(title: 'Recommended For You'),
+                const _SectionHeader(title: 'Apply Today'),
                 const SizedBox(height: 12),
                 PressableScale(
                   onTap: () {
@@ -711,6 +730,16 @@ class _PersonalizedRecommendationSection extends StatelessWidget {
                                   color: kMuted,
                                   size: 13,
                                   weight: FontWeight.w700,
+                                ).copyWith(height: 1.35),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                item.opensJourney
+                                    ? 'Begin with one guided day.'
+                                    : 'Read once. Carry one action.',
+                                style: gitaTransliteration(
+                                  color: kSoftGold.withValues(alpha: 0.86),
+                                  size: 12,
                                 ).copyWith(height: 1.35),
                               ),
                             ],
@@ -901,6 +930,25 @@ Future<void> _continueJourneyFromHome(BuildContext context) async {
     _homeDebugLog('selected journey saved: $journeyId');
   }
 
+  final progress = await LocalStorageService.journeyProgress();
+  final current = JourneyService.currentJourneyFromProgress(
+    progress,
+    selectedJourneyId: journeyId,
+  );
+  if (current.isComplete) {
+    final completedIds = JourneyService.completedJourneysFromProgress(progress)
+        .map((journey) => journey.id)
+        .toSet();
+    final nextJourney = JourneyService.recommendedAfterCompletion()
+        .where((journey) => !completedIds.contains(journey.id))
+        .firstOrNull;
+    if (nextJourney != null) {
+      journeyId = nextJourney.id;
+      _homeDebugLog('completed journey → starting $journeyId');
+      await LocalStorageService.startJourney(journeyId);
+    }
+  }
+
   final day = await LocalStorageService.currentJourneyDay();
   _homeDebugLog('opening day number: $day');
   if (!context.mounted) {
@@ -911,156 +959,6 @@ Future<void> _continueJourneyFromHome(BuildContext context) async {
       builder: (_) => TransformationPageWidget(initialJourneyId: journeyId),
     ),
   );
-}
-
-Future<void> _showNextJourneyPicker(BuildContext context) async {
-  _homeDebugLog('StartNextJourney tapped');
-  final journeys = JourneyService.recommendedAfterCompletion();
-  await showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (sheetContext) => _HomeNextJourneySheet(
-      journeys: journeys,
-      onSelect: (journey) => _startNextJourneyFromHome(
-        parentContext: context,
-        sheetContext: sheetContext,
-        journey: journey,
-      ),
-    ),
-  );
-}
-
-Future<void> _startNextJourneyFromHome({
-  required BuildContext parentContext,
-  required BuildContext sheetContext,
-  required GitaJourneySummary journey,
-}) async {
-  _homeDebugLog('selected journey id ${journey.id}');
-  await LocalStorageService.startJourney(journey.id);
-  _homeDebugLog('navigation target JourneyDay ${journey.id} day 1');
-  if (!parentContext.mounted || !sheetContext.mounted) {
-    return;
-  }
-  Navigator.of(sheetContext).pop();
-  ScaffoldMessenger.of(parentContext).showSnackBar(
-    SnackBar(
-      content: Text(
-        'Journey started',
-        style: gitaBody(color: kText, weight: FontWeight.w800),
-      ),
-      backgroundColor: kRoyalPurple,
-      behavior: SnackBarBehavior.floating,
-    ),
-  );
-  Navigator.of(parentContext).push(
-    MaterialPageRoute<void>(
-      builder: (_) => TransformationPageWidget(
-        initialJourneyId: journey.id,
-      ),
-    ),
-  );
-}
-
-class _HomeNextJourneySheet extends StatelessWidget {
-  const _HomeNextJourneySheet({
-    required this.journeys,
-    required this.onSelect,
-  });
-
-  final List<GitaJourneySummary> journeys;
-  final Future<void> Function(GitaJourneySummary journey) onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.all(14),
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
-        decoration: BoxDecoration(
-          color: kCard,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: kGold.withValues(alpha: 0.24)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 28,
-              offset: const Offset(0, 18),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AccentPill('Choose Your Next Journey'),
-            const SizedBox(height: 14),
-            Text(
-              'Begin gently with a path that fits this season.',
-              style: gitaBody(color: kMuted, size: 13).copyWith(height: 1.45),
-            ),
-            const SizedBox(height: 14),
-            for (final journey in journeys) ...[
-              PressableScale(
-                onTap: () => onSelect(journey),
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  key: ValueKey('home_next_journey_${journey.id}'),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: kCream,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: kGold.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const IconMedallion(
-                        icon: Icons.route_rounded,
-                        size: 38,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              journey.title,
-                              style: gitaBody(
-                                color: kDarkText,
-                                weight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${journey.totalDays} days',
-                              style: gitaBody(
-                                color: kDarkText.withValues(alpha: 0.66),
-                                size: 12,
-                                weight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: kGold,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (journey != journeys.last) const SizedBox(height: 10),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _ContinueReadingData {
@@ -1110,15 +1008,17 @@ class _ContinueReadingCard extends StatelessWidget {
     final hasProgress = current != null && current.hasSavedProgress;
     final subtitle = hasProgress
         ? 'Chapter ${current.verse.chapterNumber} • Verse ${current.verse.verseNumber}'
-        : 'Start Reading';
+        : 'Begin gently';
     final verseText = current?.verse.englishTranslation ??
-        'Open the scripture reader and your last read verse will be saved here.';
+        'Open the Gita gently. Your place will be remembered here.';
     final progressValue = current?.progressValue ?? 0;
     final recencyLabel = current == null
-        ? 'Your reading place will be saved automatically'
+        ? 'Your reading place will be remembered here'
         : current.wasReadToday
             ? 'Last read today'
             : 'Last read saved on this device';
+    final primaryLabel =
+        !hasProgress ? 'Begin with one verse' : 'Continue Reading';
 
     return PremiumCard(
       accent: current != null && current.hasSavedProgress,
@@ -1149,20 +1049,21 @@ class _ContinueReadingCard extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [kGold, kSoftGold, kAntiqueGold],
+                    color: kRoyalPurple.withValues(alpha: 0.10),
+                    border: Border.all(
+                      color: kGold.withValues(alpha: 0.18),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: kGold.withValues(alpha: 0.18),
-                        blurRadius: 18,
+                        color: kDeepBrinjal.withValues(alpha: 0.10),
+                        blurRadius: 14,
                         offset: const Offset(0, 8),
                       ),
                     ],
                   ),
                   child: const Icon(
                     Icons.auto_stories_rounded,
-                    color: kDarkText,
+                    color: kRoyalPurple,
                     size: 25,
                   ),
                 ),
@@ -1172,9 +1073,7 @@ class _ContinueReadingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        !hasProgress
-                            ? 'Begin Your Reading'
-                            : 'Continue Reading',
+                        primaryLabel,
                         style: gitaBody(
                           color: kRoyalPurple,
                           weight: FontWeight.w900,
@@ -1262,21 +1161,18 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final journey = current.journey;
     final progress = current.completedCount / journey.totalDays;
-    final isComplete = current.isComplete;
     return PremiumCard(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AccentPill(isComplete ? 'Journey Complete' : 'Current Journey'),
+          const AccentPill('Continue Your Journey'),
           const SizedBox(height: 14),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconMedallion(
-                icon: isComplete
-                    ? Icons.check_circle_rounded
-                    : Icons.route_rounded,
+              const IconMedallion(
+                icon: Icons.route_rounded,
                 size: 46,
               ),
               const SizedBox(width: 14),
@@ -1294,18 +1190,11 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      isComplete
-                          ? 'You completed ${journey.title}.'
-                          : 'Day ${current.nextDay} of ${journey.totalDays}',
+                      'Day ${current.nextDay} of ${journey.totalDays}',
                       style: gitaBody(
                         color: kAntiqueGold,
                         weight: FontWeight.w900,
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      journey.subtitle,
-                      style: gitaBody(color: kMuted, size: 13),
                     ),
                   ],
                 ),
@@ -1323,68 +1212,12 @@ class _HomeCurrentJourneyCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  isComplete
-                      ? current.progressLabel
-                      : '${current.completedCount} Days of Reflection',
-                  style: gitaBody(
-                    color: kMuted,
-                    size: 13,
-                    weight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: onContinue,
-                icon: Icon(
-                  isComplete
-                      ? Icons.verified_rounded
-                      : Icons.play_arrow_rounded,
-                  size: 18,
-                ),
-                label: Text(
-                  isComplete ? 'Start Next Journey' : 'Continue Journey',
-                ),
-                style: TextButton.styleFrom(
-                  foregroundColor: kGold,
-                  textStyle: gitaBody(size: 13, weight: FontWeight.w900),
-                ),
-              ),
-            ],
+          GoldButton(
+            key: const ValueKey('home_journey_continue'),
+            label: 'Continue',
+            icon: Icons.arrow_forward_rounded,
+            onPressed: onContinue,
           ),
-          if (isComplete) ...[
-            const SizedBox(height: 12),
-            Text(
-              'What insight will you carry forward?',
-              style: gitaBody(
-                color: kText,
-                size: 14,
-                weight: FontWeight.w700,
-              ).copyWith(height: 1.45),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Recommended next journeys',
-              style: gitaBody(
-                color: kMuted,
-                size: 13,
-                weight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final journey
-                    in JourneyService.recommendedAfterCompletion())
-                  AccentPill(journey.title),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -1404,13 +1237,13 @@ class _PrimaryActionCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       ('Read Gita', Icons.menu_book_rounded, onRead),
-      ('Ask Gita', Icons.music_note_rounded, onAsk),
+      ('Ask Gita', Icons.self_improvement_rounded, onAsk),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionHeader(
-          title: 'Read or Ask',
+          title: 'Explore when ready',
         ),
         const SizedBox(height: 14),
         _ActionRow(
@@ -1443,7 +1276,7 @@ class _SecondaryActionCards extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionHeader(title: 'Keep Reflecting'),
+        const _SectionHeader(title: 'Return to your practice'),
         const SizedBox(height: 14),
         _ActionRow(
           actions: actions,
@@ -1545,13 +1378,13 @@ class _GlowQuickButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(26),
           border: Border.all(
             color: highlighted
-                ? kGold.withValues(alpha: 0.58)
+                ? kSoftGold.withValues(alpha: 0.30)
                 : kGold.withValues(alpha: 0.28),
           ),
           boxShadow: [
             BoxShadow(
-              color: kGold.withValues(alpha: highlighted ? 0.28 : 0.16),
-              blurRadius: highlighted ? 32 : 24,
+              color: kDeepBrinjal.withValues(alpha: highlighted ? 0.18 : 0.12),
+              blurRadius: highlighted ? 24 : 20,
               offset: const Offset(0, 12),
             ),
             BoxShadow(
@@ -1611,9 +1444,9 @@ class _GoldenQuickIcon extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: selected
               ? const [
-                  kGold,
-                  kSoftGold,
-                  kAntiqueGold,
+                  kNavy,
+                  kPeacockBlue,
+                  kNavy,
                 ]
               : [
                   kCard.withValues(alpha: 0.98),
@@ -1623,32 +1456,24 @@ class _GoldenQuickIcon extends StatelessWidget {
         ),
         border: Border.all(
           color: selected
-              ? kAntiqueGold.withValues(alpha: 0.92)
-              : kGold.withValues(alpha: 0.34),
-          width: selected ? 1.4 : 1,
+              ? kSoftGold.withValues(alpha: 0.32)
+              : kGold.withValues(alpha: 0.22),
         ),
         boxShadow: [
           BoxShadow(
-            color: kGold.withValues(alpha: selected ? 0.42 : 0.20),
-            blurRadius: selected ? 28 : 18,
-            spreadRadius: selected ? 1 : 0,
+            color: kDeepBrinjal.withValues(alpha: selected ? 0.22 : 0.16),
+            blurRadius: selected ? 22 : 16,
             offset: const Offset(0, 8),
           ),
-          if (selected)
-            BoxShadow(
-              color: kAntiqueGold.withValues(alpha: 0.28),
-              blurRadius: 12,
-              spreadRadius: 1,
-            ),
         ],
       ),
       child: AnimatedScale(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
-        scale: selected ? 1.07 : 1,
+        scale: selected ? 1.02 : 1,
         child: Icon(
           icon,
-          color: selected ? kRoyalPurple : kGold,
+          color: selected ? kAntiqueGold : kSoftGold,
           size: selected ? 27 : 25,
         ),
       ),

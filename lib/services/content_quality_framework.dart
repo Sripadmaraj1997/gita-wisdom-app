@@ -69,6 +69,45 @@ class Reflection {
   final EmotionalIntent intent;
 }
 
+class VerseEnrichment {
+  const VerseEnrichment({
+    required this.chapterNumber,
+    required this.verseNumber,
+    required this.meaning,
+    required this.interpretation,
+    required this.reflection,
+    required this.practiceToday,
+    required this.tags,
+  });
+
+  final int chapterNumber;
+  final int verseNumber;
+  final String meaning;
+  final String interpretation;
+  final String reflection;
+  final String practiceToday;
+  final List<String> tags;
+
+  String get verseId => '$chapterNumber.$verseNumber';
+
+  bool get isComplete =>
+      meaning.trim().isNotEmpty &&
+      interpretation.trim().isNotEmpty &&
+      reflection.trim().isNotEmpty &&
+      practiceToday.trim().isNotEmpty &&
+      tags.isNotEmpty;
+
+  Map<String, dynamic> toJson() => {
+        'chapterNumber': chapterNumber,
+        'verseNumber': verseNumber,
+        'meaning': meaning,
+        'interpretation': interpretation,
+        'reflection': reflection,
+        'practiceToday': practiceToday,
+        'tags': tags,
+      };
+}
+
 class VerseContentQuality {
   const VerseContentQuality({
     required this.verseId,
@@ -86,6 +125,16 @@ class VerseContentQuality {
 
   int get chapterNumber => int.parse(verseId.split('.').first);
   int get verseNumber => int.parse(verseId.split('.').last);
+
+  VerseEnrichment toEnrichment({required String meaning}) => VerseEnrichment(
+        chapterNumber: chapterNumber,
+        verseNumber: verseNumber,
+        meaning: meaning,
+        interpretation: gitaWisdomInterpretation,
+        reflection: reflection.text,
+        practiceToday: practiceToday.text,
+        tags: topicTags.values,
+      );
 }
 
 class ContentQualityFramework {
@@ -247,6 +296,27 @@ class ContentQualityFramework {
     };
   }
 
+  static int get enrichedVerseCount => reviewedReflections().length;
+
+  static List<String> duplicateVerseEnrichmentIds() {
+    final seen = <String>{};
+    final duplicates = <String>{};
+    for (final seed in _reviewedSeeds) {
+      if (!seen.add(seed.verseId)) {
+        duplicates.add(seed.verseId);
+      }
+    }
+    for (final verseId in _curatedContent.keys) {
+      if (!_reviewedSeeds.any((seed) => seed.verseId == verseId)) {
+        continue;
+      }
+      if (_curatedContent.keys.where((id) => id == verseId).length > 1) {
+        duplicates.add(verseId);
+      }
+    }
+    return duplicates.toList(growable: false)..sort();
+  }
+
   static VerseContentQuality? contentForVerse(String verseId) {
     final index = _reviewedSeeds.indexWhere((seed) => seed.verseId == verseId);
     if (index < 0) {
@@ -281,7 +351,12 @@ class ContentQualityFramework {
         category: seed.intent,
       ),
       topicTags: TopicTags(_tagsFor(seed.intent)),
+      gitaWisdomInterpretation: _interpretationFor(seed.intent),
     );
+  }
+
+  static String _interpretationFor(EmotionalIntent intent) {
+    return _interpretationBank[intent]!;
   }
 
   static List<String> _tagsFor(EmotionalIntent intent) {
@@ -471,7 +546,7 @@ const _curatedContent = <String, VerseContentQuality>{
       intent: EmotionalIntent.workStress,
     ),
     practiceToday: PracticeToday(
-      text: 'Complete one task with quiet steadiness.',
+      text: 'Complete one action with quiet steadiness.',
       category: EmotionalIntent.workStress,
     ),
     topicTags: TopicTags([
@@ -558,7 +633,7 @@ const _curatedContent = <String, VerseContentQuality>{
       intent: EmotionalIntent.devotion,
     ),
     practiceToday: PracticeToday(
-      text: 'Offer one difficult task inwardly.',
+      text: 'Offer one difficult action inwardly.',
       category: EmotionalIntent.devotion,
     ),
     topicTags: TopicTags([
@@ -800,7 +875,7 @@ const _curatedContent = <String, VerseContentQuality>{
       intent: EmotionalIntent.devotion,
     ),
     practiceToday: PracticeToday(
-      text: 'Begin one task with quiet remembrance.',
+      text: 'Begin one action with quiet remembrance.',
       category: EmotionalIntent.devotion,
     ),
     topicTags: TopicTags([
@@ -860,6 +935,37 @@ const _curatedContent = <String, VerseContentQuality>{
   ),
 };
 
+const _interpretationBank = {
+  EmotionalIntent.anxiety:
+      'This verse steadies the anxious heart by returning attention to trust, presence, and the next sincere action. Anxiety loses force when the whole future is no longer carried at once.',
+  EmotionalIntent.fear:
+      'This verse meets fear with courage rooted in wisdom rather than force. It invites action from steadiness, not from panic or the need to control every result.',
+  EmotionalIntent.anger:
+      'This verse points to self-mastery when emotion is strong. Anger becomes less destructive when awareness creates space before speech or action.',
+  EmotionalIntent.grief:
+      'This verse gives grief a wider spiritual frame without denying pain. It helps the heart hold loss with tenderness, patience, and trust in what is deeper than change.',
+  EmotionalIntent.uncertainty:
+      'This verse supports clarity when the mind feels divided. Wisdom begins by pausing, listening honestly, and taking the next dharmic step without demanding perfect certainty.',
+  EmotionalIntent.attachment:
+      'This verse loosens the grip of attachment by separating sincere effort from ownership of outcomes. Freedom grows when action is offered cleanly.',
+  EmotionalIntent.discipline:
+      'This verse treats discipline as repeated alignment rather than harshness. A steady practice is built through small, truthful actions returned to again and again.',
+  EmotionalIntent.motivation:
+      'This verse renews motivation by bringing attention back to meaningful action. The first faithful step matters more than waiting for a perfect inner mood.',
+  EmotionalIntent.purpose:
+      'This verse connects purpose with dharma, service, and the responsibility close at hand. Meaning becomes clearer when action is aligned with what is true.',
+  EmotionalIntent.workStress:
+      'This verse brings work back into balance by joining effort with steadiness. Responsibility remains, but pressure softens when identity is not tied to every result.',
+  EmotionalIntent.relationships:
+      'This verse brings spiritual practice into speech, conduct, and care for others. Relationship becomes a field for compassion, restraint, honesty, and humility.',
+  EmotionalIntent.devotion:
+      'This verse centers devotion as remembrance, offering, and trust in the Divine. Bhakti becomes practical when love shapes attention and action.',
+  EmotionalIntent.peace:
+      'This verse points toward peace that is deeper than changing circumstances. The heart becomes steadier by observing what passes without surrendering its center.',
+  EmotionalIntent.selfMastery:
+      'This verse teaches that the mind can become a friend through patient training. Self-mastery grows through awareness, restraint, and repeated return.',
+};
+
 const _reflectionBank = {
   EmotionalIntent.anxiety: [
     'Anxiety often tries to solve too much at once. Trust returns when attention comes back to the next sincere action. Peace grows when the heart stops carrying every outcome alone.',
@@ -908,8 +1014,8 @@ const _reflectionBank = {
   ],
   EmotionalIntent.workStress: [
     'Work becomes heavy when everything feels equally important. Sincere action and steadiness narrow the field. One clear priority can bring the mind back.',
-    'Pressure can scatter attention and drain dignity from the task. Care returns when action becomes steady again. Do the work without letting panic lead.',
-    'A busy day can pull the heart away from purpose. Work becomes lighter when it is treated as offering rather than burden. Give one task your full presence.',
+    'Pressure can scatter attention and drain dignity from the work. Care returns when action becomes steady again. Do the work without letting panic lead.',
+    'A busy day can pull the heart away from purpose. Work becomes lighter when it is treated as offering rather than burden. Give one action your full presence.',
   ],
   EmotionalIntent.relationships: [
     'Relationships test the quality of our inner state. Kindness, restraint, and truthful care keep the heart clean. Peace often begins with one softer response.',
@@ -950,7 +1056,7 @@ const _practiceBank = {
     'Speak one sentence more softly.',
   ],
   EmotionalIntent.grief: [
-    'Take one gentle breath before the next task.',
+    'Take one gentle breath before the next step.',
     'Let one feeling be present without rushing it.',
     'Do one kind thing for your heart.',
   ],
@@ -960,14 +1066,14 @@ const _practiceBank = {
     'Write the simplest truthful option.',
   ],
   EmotionalIntent.attachment: [
-    'Complete one task without checking the result.',
+    'Complete one action without checking the result.',
     'Offer your effort, then let it rest.',
     'Release one outcome you cannot control.',
   ],
   EmotionalIntent.discipline: [
-    'Do one focused task for 15 minutes.',
+    'Give one action your full attention for 15 minutes.',
     'Begin again gently where you slipped.',
-    'Finish one necessary task first.',
+    'Finish one necessary duty first.',
   ],
   EmotionalIntent.motivation: [
     'Start with five sincere minutes.',
@@ -980,7 +1086,7 @@ const _practiceBank = {
     'Do the responsibility nearest to you.',
   ],
   EmotionalIntent.workStress: [
-    'Finish one task before starting another.',
+    'Finish one action before starting another.',
     'Choose one priority and protect it.',
     'Work for ten minutes without panic.',
   ],
@@ -991,7 +1097,7 @@ const _practiceBank = {
   ],
   EmotionalIntent.devotion: [
     'Offer one ordinary action quietly.',
-    'Begin one task with remembrance.',
+    'Begin one action with remembrance.',
     'Make one small act an offering.',
   ],
   EmotionalIntent.peace: [

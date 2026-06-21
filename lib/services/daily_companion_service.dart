@@ -48,9 +48,9 @@ class DailyCompanionService {
       chapterNumber: 2,
       reference: 'Bhagavad Gita 2.47',
       reflection:
-          'Peace grows when you give sincere effort without trying to control every result.',
+          'You do not need to carry the result before you have taken the next sincere step.',
       practiceToday:
-          'Take one sincere action today without worrying about the result.',
+          'Choose one task, finish the next small step, and pause before checking the outcome.',
       journalPrompt: 'What attachment can you soften today?',
       topic: 'attachment',
     ),
@@ -59,8 +59,9 @@ class DailyCompanionService {
       chapterNumber: 2,
       reference: 'Bhagavad Gita 2.14',
       reflection:
-          'Difficult feelings rise and pass. You do not have to become every feeling that visits you.',
-      practiceToday: 'Pause before reacting. Let one feeling move through.',
+          'A difficult feeling can be real without becoming the ruler of your whole day.',
+      practiceToday:
+          'When one feeling rises, take three slow breaths before you answer it.',
       journalPrompt: 'What disturbed your peace today?',
       topic: 'peace',
     ),
@@ -69,8 +70,9 @@ class DailyCompanionService {
       chapterNumber: 3,
       reference: 'Bhagavad Gita 3.8',
       reflection:
-          'A simple duty done with care can become a quiet path back to peace.',
-      practiceToday: 'Give one responsibility your full attention for a while.',
+          'When life feels scattered, one duty done with care can bring you back to yourself.',
+      practiceToday:
+          'Give one responsibility ten undistracted minutes before moving to the next.',
       journalPrompt: 'Where can you act with more steadiness?',
       topic: 'discipline',
     ),
@@ -79,8 +81,9 @@ class DailyCompanionService {
       chapterNumber: 6,
       reference: 'Bhagavad Gita 6.5',
       reflection:
-          'Your mind can become a friend when you guide it with patience instead of force.',
-      practiceToday: 'Speak to yourself once today with patience.',
+          'Your mind becomes easier to guide when you stop treating every wandering thought as failure.',
+      practiceToday:
+          'When your mind wanders, gently return to one breath or one task.',
       journalPrompt: 'What gave you clarity today?',
       topic: 'clarity',
     ),
@@ -89,8 +92,9 @@ class DailyCompanionService {
       chapterNumber: 12,
       reference: 'Bhagavad Gita 12.13',
       reflection:
-          'Devotion becomes real in small moments of kindness, patience, and care.',
-      practiceToday: 'Offer one quiet act of kindness without needing credit.',
+          'Devotion becomes real when love shapes how you speak, listen, and act.',
+      practiceToday:
+          'Offer one quiet act of kindness without explaining it or needing credit.',
       journalPrompt: 'Where can you bring more gentleness today?',
       topic: 'devotion',
     ),

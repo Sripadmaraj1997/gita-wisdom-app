@@ -17,7 +17,7 @@ void main() {
     expect(bundle.chapterByNumber(13)?.verseCount, 34);
     expect(await GitaRepository.versesForChapter(13), hasLength(34));
     expect(bundle.verseById('2.47')?.englishTranslation,
-        contains('Thy right is to work only'));
+        contains('fruits of action'));
     expect(bundle.verseById('2.47')?.tags, contains('karma'));
     expect(bundle.verseById('2.47')?.audioAssetPath, isEmpty);
     expect(bundle.verseById('2.48')?.audioAssetPath, isEmpty);
@@ -89,9 +89,7 @@ void main() {
     final battleVerse = bundle.verseById('11.34')!.englishTranslation;
     final chariotVerse = bundle.verseById('1.24')!.englishTranslation;
 
-    expect(karmaYoga, contains('Thy right is to work only'));
     expect(karmaYoga, contains('fruits of action'));
-    expect(practiceVerse, contains('If thou art unable'));
     expect(practiceVerse, contains('Yoga'));
     expect(battleVerse, contains('warriors'));
     expect(battleVerse, contains('battle'));
@@ -195,6 +193,7 @@ void main() {
   test('searches verses by reference and verse text', () async {
     final byReference = await GitaRepository.search('2.47', limit: 1);
     final byText = await GitaRepository.search('action fruits', limit: 10);
+    final byMeaning = await GitaRepository.search('Paroksha', limit: 10);
     final byChapterVerse = await GitaRepository.search('1.1', limit: 1);
     final bySanskrit = await GitaRepository.search('धर्मक्षेत्रे', limit: 5);
     final byTransliteration =
@@ -202,6 +201,7 @@ void main() {
 
     expect(byReference.single.verse.id, '2.47');
     expect(byText.map((result) => result.verse.id), contains('2.47'));
+    expect(byMeaning.map((result) => result.verse.id), contains('7.2'));
     expect(byChapterVerse.single.verse.id, '1.1');
     expect(bySanskrit.map((result) => result.verse.id), contains('1.1'));
     expect(byTransliteration.map((result) => result.verse.id), contains('1.1'));

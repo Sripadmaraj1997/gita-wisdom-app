@@ -626,17 +626,21 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(journalEntriesKey);
       if (raw == null || raw.isEmpty) {
+        debugPrint('Journal storage load success: 0 entries');
         return const [];
       }
       final decoded = jsonDecode(raw);
       if (decoded is! List) {
+        debugPrint('Journal storage load success: 0 entries');
         return const [];
       }
-      return decoded
+      final entries = decoded
           .whereType<Map<String, dynamic>>()
           .map(LocalJournalEntry.fromJson)
           .toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      debugPrint('Journal storage load success: ${entries.length} entries');
+      return entries;
     } catch (error, stackTrace) {
       debugPrint('Local journal load failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -645,6 +649,7 @@ class LocalStorageService {
   }
 
   static Future<void> upsertJournalEntry(LocalJournalEntry entry) async {
+    debugPrint('Journal storage write started: ${entry.id}');
     final entries = await journalEntries();
     final updated = [
       entry,
@@ -654,6 +659,7 @@ class LocalStorageService {
       journalEntriesKey,
       updated.map((item) => item.toJson()),
     );
+    debugPrint('Journal storage write success: ${entry.id}');
     await recordJournalReflection();
     await PersonalizationService.recordJournalActivity(entry.searchableText);
   }
@@ -959,11 +965,11 @@ class LocalStorageService {
   static Future<String> themeMode() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(themeModeKey) ?? 'golden_flute_lotus';
+      return prefs.getString(themeModeKey) ?? 'golden_lotus';
     } catch (error, stackTrace) {
       debugPrint('Theme setting load failed: $error');
       debugPrintStack(stackTrace: stackTrace);
-      return 'golden_flute_lotus';
+      return 'golden_lotus';
     }
   }
 

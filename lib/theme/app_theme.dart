@@ -1,8 +1,7 @@
 // Global design system for the offline Gita Wisdom MVP.
 //
-// The visual identity is a dark Krishna-blue spiritual background with gold
-// accents, royal purple cards, and cream reading surfaces. Long-form scripture
-// text should always use dark text on cream cards for readability.
+// The visual identity is quiet, warm, grounded, and timeless: deep blue for
+// stillness, warm cream for reading, and soft gold as a restrained accent.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -15,13 +14,13 @@ class AppColors {
   // prevents bright overlays from reducing text contrast.
   static const deepNavy = Color(0xFF071E3D);
   static const navy = Color(0xFF061A2E);
-  static const royalPurple = Color(0xFF4B235F);
-  static const purpleInk = Color(0xFF3A1F4A);
+  static const royalPurple = Color(0xFF253A5A);
+  static const purpleInk = Color(0xFF102A4C);
   static const deepBrinjal = Color(0xFF061A2E);
   static const peacockTeal = Color(0xFF0B2C5F);
   static const peacockBlue = Color(0xFF0B2C5F);
   static const card = Color(0xFF061A2E);
-  static const cardAlt = Color(0xFF4B235F);
+  static const cardAlt = Color(0xFF0B2C5F);
   static const gold = Color(0xFFD4AF37);
   static const templeGold = Color(0xFFD4AF37);
   static const antiqueGold = Color(0xFFF4E7B2);
@@ -33,7 +32,7 @@ class AppColors {
   static const saffron = Color(0xFFD4AF37);
   static const ivory = Color(0xFFFFF7E8);
   static const muted = Color(0xFFD8CCBE);
-  static const line = Color(0x55D4AF37);
+  static const line = Color(0x33D4AF37);
   static const sage = Color(0xFF0B2C5F);
   static const inputPlaceholder = Color(0xFF6F6258);
   static const secondaryDarkText = Color(0xFF6F6258);
@@ -59,22 +58,20 @@ class AppGradients {
         end: Alignment.bottomRight,
         colors: [
           AppColors.card.withValues(alpha: 0.96),
-          AppColors.cardAlt.withValues(alpha: 0.88),
-          AppColors.purpleInk.withValues(alpha: 0.82),
-          AppColors.gold.withValues(alpha: 0.08),
+          AppColors.cardAlt.withValues(alpha: 0.86),
+          AppColors.navy.withValues(alpha: 0.92),
         ],
       );
 
-  static LinearGradient get brinjalCard => LinearGradient(
+  static LinearGradient get brinjalCard => const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
           AppColors.deepBrinjal,
-          AppColors.royalPurple,
+          AppColors.peacockBlue,
           AppColors.deepBrinjal,
-          AppColors.gold.withValues(alpha: 0.12),
         ],
-        stops: const [0, 0.56, 0.88, 1],
+        stops: [0, 0.58, 1],
       );
 
   static LinearGradient get divineGlow => LinearGradient(
@@ -92,9 +89,9 @@ class AppGradients {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          AppColors.gold,
           AppColors.softGold,
           AppColors.antiqueGold,
+          AppColors.softGold,
         ],
       );
 
@@ -210,26 +207,21 @@ class AppShadows {
   static List<BoxShadow> get soft => [
         BoxShadow(
           color: AppColors.deepBrinjal.withValues(alpha: 0.20),
-          blurRadius: 22,
-          offset: const Offset(0, 12),
-        ),
-        BoxShadow(
-          color: AppColors.gold.withValues(alpha: 0.14),
-          blurRadius: 28,
-          offset: const Offset(0, 14),
+          blurRadius: 18,
+          offset: const Offset(0, 10),
         ),
       ];
 
   static List<BoxShadow> get goldGlow => [
         BoxShadow(
-          color: AppColors.gold.withValues(alpha: 0.24),
-          blurRadius: 24,
-          offset: const Offset(0, 10),
-        ),
-        BoxShadow(
-          color: AppColors.deepBrinjal.withValues(alpha: 0.12),
+          color: AppColors.deepBrinjal.withValues(alpha: 0.18),
           blurRadius: 18,
           offset: const Offset(0, 8),
+        ),
+        BoxShadow(
+          color: AppColors.gold.withValues(alpha: 0.06),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
         ),
       ];
 }
@@ -403,16 +395,15 @@ class PremiumCard extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     AppColors.card.withValues(alpha: 0.96),
-                    AppColors.cardAlt.withValues(alpha: 0.92),
-                    AppColors.deepBrinjal.withValues(alpha: 0.82),
-                    AppColors.gold.withValues(alpha: 0.06),
+                    AppColors.cardAlt.withValues(alpha: 0.86),
+                    AppColors.navy.withValues(alpha: 0.92),
                   ],
                 ),
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(
             color: accent
-                ? AppColors.gold.withValues(alpha: 0.66)
-                : AppColors.gold.withValues(alpha: 0.38),
+                ? AppColors.gold.withValues(alpha: 0.26)
+                : AppColors.gold.withValues(alpha: 0.16),
           ),
           boxShadow: AppShadows.soft,
         ),
@@ -438,8 +429,8 @@ class GoldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Gold buttons use dark text to maintain contrast; disabled buttons return
-    // to a dark surface instead of low-contrast faded gold.
+    // Primary actions should feel steady, not flashy. Soft gold is reserved for
+    // the action surface, with subdued shadowing and high contrast text.
     final enabled = onPressed != null && !isLoading;
     return PressableScale(
       enabled: enabled,
@@ -458,7 +449,7 @@ class GoldButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
             color: enabled
-                ? AppColors.deepBrinjal.withValues(alpha: 0.72)
+                ? AppColors.antiqueGold.withValues(alpha: 0.42)
                 : AppColors.gold.withValues(alpha: 0.24),
           ),
           boxShadow: enabled ? AppShadows.goldGlow : null,
@@ -598,10 +589,10 @@ class AnimatedGoldIconButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: backgroundColor,
-          gradient: backgroundColor == null ? AppGradients.goldAction : null,
-          border: Border.all(color: AppColors.gold.withValues(alpha: 0.22)),
-          boxShadow: AppShadows.goldGlow,
+          color: backgroundColor ?? AppColors.cardAlt.withValues(alpha: 0.78),
+          gradient: null,
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.18)),
+          boxShadow: AppShadows.soft,
         ),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
@@ -687,16 +678,11 @@ class EmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cream,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.34)),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.18)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.14),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-          BoxShadow(
             color: AppColors.deepBrinjal.withValues(alpha: 0.12),
-            blurRadius: 22,
+            blurRadius: 18,
             offset: const Offset(0, 10),
           ),
         ],
@@ -751,7 +737,7 @@ class LoadingState extends StatelessWidget {
                 height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.gold,
+                  color: AppColors.softGold,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),

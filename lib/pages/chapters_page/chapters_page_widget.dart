@@ -252,7 +252,10 @@ class _VerseSearchResults extends StatelessWidget {
                 child: PremiumCard(
                   onTap: () => context.push(Uri(
                     path: '/verseReaderPage',
-                    queryParameters: {'verseId': results[i].verse.id},
+                    queryParameters: {
+                      'verseId': results[i].verse.id,
+                      'source': 'search',
+                    },
                   ).toString()),
                   padding: const EdgeInsets.all(20),
                   child: Row(
@@ -306,7 +309,10 @@ class _ChapterCard extends StatelessWidget {
     final verseId = '${chapter.chapterNumber}.1';
     void read() => context.push(Uri(
           path: '/verseReaderPage',
-          queryParameters: {'verseId': verseId},
+          queryParameters: {
+            'verseId': verseId,
+            'source': 'chapter',
+          },
         ).toString());
     return ChapterListCard(
       onTap: read,
@@ -352,16 +358,16 @@ class _ChapterActionButton extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [kGold, kSoftGold, kAntiqueGold],
+            colors: [kNavy, kPeacockBlue, kNavy],
           ),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
-            color: kAntiqueGold.withValues(alpha: 0.62),
+            color: kGold.withValues(alpha: 0.18),
           ),
           boxShadow: [
             BoxShadow(
-              color: kGold.withValues(alpha: 0.22),
-              blurRadius: 16,
+              color: kDeepBrinjal.withValues(alpha: 0.18),
+              blurRadius: 14,
               offset: const Offset(0, 8),
             ),
           ],
@@ -369,12 +375,12 @@ class _ChapterActionButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 17, color: kDarkText),
+            Icon(icon, size: 17, color: kAntiqueGold),
             const SizedBox(width: 7),
             Text(
               label,
               style: gitaBody(
-                color: kDarkText,
+                color: kText,
                 size: 12,
                 weight: FontWeight.w900,
               ),

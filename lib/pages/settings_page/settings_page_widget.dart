@@ -14,6 +14,11 @@
 /// - LocalStorageService for preferences and local data reset.
 /// - ReadingProgressService for Continue Reading reset.
 ///
+/// User flow:
+/// Settings exists to make reading comfortable, explain trust/privacy, and give
+/// the user control over local memory. It should stay small so it does not turn
+/// a spiritual reading app into an account or configuration product.
+///
 /// Notes:
 /// There are no account, subscription, Firebase, cloud, or OpenAI settings in
 /// this offline-first build, so Settings intentionally remains small.
@@ -53,7 +58,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
         children: [
           const PageHeader(
             title: 'Settings',
-            subtitle: 'Offline app settings and saved reflections',
+            subtitle: 'Local reading, reflection, and privacy',
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 36),
@@ -101,17 +106,6 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                     onTap: () => context.push(SupportPageWidget.routePath),
                   ),
                 ),
-                const AnimatedEntrance(
-                  delay: Duration(milliseconds: 106),
-                  child: _SettingRow(
-                    icon: Icons.people_outline_rounded,
-                    label: 'Community Links',
-                    value: 'None active',
-                    valueColor: kSoftGold,
-                    iconColor: kSoftGold,
-                    onTap: null,
-                  ),
-                ),
                 const SizedBox(height: 12),
                 // About / disclaimer:
                 // Keep source notes and spiritual-scope language close to app
@@ -130,7 +124,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                 // Removes user-owned saved content and preferences from this
                 // device. Bundled scripture JSON remains part of the app.
                 const _SettingsSectionHeader(
-                  title: 'Data',
+                  title: 'Local Memory',
                   icon: Icons.storage_rounded,
                 ),
                 const SizedBox(height: 10),
@@ -138,8 +132,10 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                   delay: const Duration(milliseconds: 210),
                   child: _SettingRow(
                     icon: Icons.delete_sweep_rounded,
-                    label: _isClearing ? 'Clearing...' : 'Clear Local Data',
-                    value: 'Local only',
+                    label: _isClearing
+                        ? 'Clearing gently...'
+                        : 'Clear Local Memory',
+                    value: 'On this device',
                     valueColor: kSoftGold,
                     iconColor: kSoftGold,
                     onTap: _isClearing ? null : _confirmClearData,
@@ -160,9 +156,9 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: kCard,
-        title: Text('Clear local data?', style: gitaTitle(22)),
+        title: Text('Clear local memory?', style: gitaTitle(22)),
         content: Text(
-          'This removes saved verses, highlights, journal entries, journey progress, Ask Gita history, personalized guidance signals, font size, and continue reading progress from this device only.',
+          'This clears your saved wisdom, highlights, journal, journeys, Ask Gita history, guidance memory, font size, and remembered reading place from this device only.',
           style: gitaBody(color: kText),
         ),
         actions: [
@@ -172,7 +168,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Clear', style: gitaBody(color: kSaffron)),
+            child: Text('Clear Local Memory', style: gitaBody(color: kGold)),
           ),
         ],
       ),
@@ -187,7 +183,8 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
       await ReadingProgressService.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Local data cleared.')),
+          const SnackBar(
+              content: Text('Local memory cleared from this device.')),
         );
       }
     } catch (error, stackTrace) {
@@ -195,7 +192,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
       debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Local data was not cleared.')),
+          const SnackBar(content: Text('Local memory is unchanged.')),
         );
       }
     } finally {
@@ -513,15 +510,23 @@ class _SettingRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: gitaBody(color: kText, weight: FontWeight.w800),
               ),
             ),
-            Text(
-              value,
-              style: gitaBody(
-                color: valueColor ?? kMuted,
-                size: 13,
-                weight: FontWeight.w800,
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: gitaBody(
+                  color: valueColor ?? kMuted,
+                  size: 13,
+                  weight: FontWeight.w800,
+                ),
               ),
             ),
             if (onTap != null) ...[

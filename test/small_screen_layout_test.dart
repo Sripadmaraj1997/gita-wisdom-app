@@ -113,9 +113,13 @@ void main() {
       find.text('Journey to Peace • Day 1 of 7'),
       findsOneWidget,
     );
+    expect(find.text("Complete Today's Reflection"), findsOneWidget);
+    expect(find.text('Back to Journey'), findsNothing);
     expect(find.text('Mark Day Complete'), findsNothing);
-    expect(find.text('Day Complete ✓'), findsNothing);
+    expect(find.text('Day Complete'), findsNothing);
     expect(find.text('Continue Journey'), findsNothing);
+    expect(find.text('Previous Verse'), findsNothing);
+    expect(find.text('Next Verse'), findsNothing);
     expect(find.textContaining('कर्मण्येवाधिकारस्ते'), findsOneWidget);
     expect(find.textContaining('karmaṇyevādhikāraste'), findsOneWidget);
     expect(find.text('Translation'), findsOneWidget);

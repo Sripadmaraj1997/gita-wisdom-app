@@ -60,6 +60,7 @@ class AskGitaLiteService {
     // text. Verse text still comes from the local scripture dataset.
     final profile = _profileFor(question);
     await PersonalizationService.recordAskGitaTopic(profile.topic);
+    await PersonalizationService.recordAskGitaQuestion(question);
     final userProfile = await PersonalizationService.interestProfile();
     final verse = await _bestVerse(profile, question, userProfile.topThemes);
     return AskGitaLiteAnswer(
@@ -78,9 +79,17 @@ class AskGitaLiteService {
     List<String> localThemes,
   ) async {
     // Verse selection:
-    // Prefer curated verse IDs for each topic. If the dataset is missing one,
-    // fall back to local search, then to the daily verse so the UI never shows
-    // an empty or generated placeholder.
+    // Prefer enriched curated verse IDs for each topic. If the dataset is
+    // missing one, fall back to enriched local search, then to any grounded
+    // local verse so the UI never shows an empty or generated placeholder.
+    for (final id in profile.verseIds) {
+      final verse = await GitaRepository.verseById(id);
+      if (verse != null &&
+          verse.hasEnrichment &&
+          verse.englishTranslation.trim().isNotEmpty) {
+        return verse;
+      }
+    }
     for (final id in profile.verseIds) {
       final verse = await GitaRepository.verseById(id);
       if (verse != null && verse.englishTranslation.trim().isNotEmpty) {
@@ -92,6 +101,12 @@ class AskGitaLiteService {
       '${profile.searchTerms} ${localThemes.join(' ')} $question',
       limit: 5,
     );
+    for (final match in matches) {
+      if (match.verse.hasEnrichment &&
+          match.verse.englishTranslation.trim().isNotEmpty) {
+        return match.verse;
+      }
+    }
     for (final match in matches) {
       if (match.verse.englishTranslation.trim().isNotEmpty) {
         return match.verse;
@@ -110,8 +125,26 @@ class AskGitaLiteService {
     if (hasAny(['anger', 'angry', 'rage', 'resent', 'irritat'])) {
       return _profiles['anger']!;
     }
-    if (hasAny(['work', 'job', 'deadline', 'pressure', 'burnout'])) {
+    if (hasAny([
+      'work',
+      'job',
+      'deadline',
+      'pressure',
+      'burnout',
+      'career',
+      'manager',
+      'office',
+    ])) {
       return _profiles['work']!;
+    }
+    if (hasAny([
+      'suffer',
+      'suffering',
+      'why am i suffering',
+      'hard time',
+      'life is painful',
+    ])) {
+      return _profiles['suffering']!;
     }
     if (hasAny([
       'anxious',
@@ -124,6 +157,9 @@ class AskGitaLiteService {
       'overwhelmed',
       'stress',
       'stressed',
+      'panic',
+      'tense',
+      'nervous',
     ])) {
       return _profiles['anxiety']!;
     }
@@ -139,6 +175,10 @@ class AskGitaLiteService {
       'confused',
       'confusion',
       'decision',
+      'doubt',
+      'doubts',
+      'which path',
+      'what should i do',
       'feel lost',
       'feeling lost',
       'lost in life',
@@ -162,6 +202,10 @@ class AskGitaLiteService {
       'mind control',
       'restless mind',
       'wandering mind',
+      'self-control',
+      'self control',
+      'impulse',
+      'temptation',
       'thoughts',
       'distracted',
       'distraction',
@@ -171,7 +215,8 @@ class AskGitaLiteService {
     if (hasAny(['devotion', 'devoted', 'bhakti', 'god', 'krishna'])) {
       return _profiles['devotion']!;
     }
-    if (hasAny(['grief', 'loss', 'lost someone', 'sad', 'sorrow'])) {
+    if (hasAny(
+        ['grief', 'loss', 'lost someone', 'sad', 'sorrow', 'mourning'])) {
       return _profiles['grief']!;
     }
     if (hasAny(['relationship', 'family', 'friend', 'partner', 'conflict'])) {
@@ -198,7 +243,7 @@ class AskGitaLiteService {
     final normalized = lower.trim().replaceAll(RegExp(r'[.!?]+$'), '');
     if (profile.topic == 'anxiety') {
       if (lower.contains('stop worrying')) {
-        return 'Worry loses strength when it is met one clear moment at a time.';
+        return 'You do not need to solve your entire future today.';
       }
       if (lower.contains('overwhelmed')) {
         return 'When everything feels too much, make the moment smaller.';
@@ -233,6 +278,9 @@ class AskGitaLiteService {
       }
       return 'Fear of failure is heavy because it ties your worth to one result.';
     }
+    if (profile.topic == 'suffering') {
+      return 'Suffering deserves tenderness before it is asked to become wisdom.';
+    }
     if (profile.topic == 'grief') {
       return 'Grief needs room to breathe before it can become bearable.';
     }
@@ -262,11 +310,15 @@ class AskGitaLiteService {
     _AskTopicProfile profile,
     GitaVerseData verse,
   ) {
-    final interpretation = verse.gitaWisdomInterpretation.trim();
-    if (interpretation.isEmpty) {
-      return profile.meaning;
+    final enrichedMeaning = verse.enrichment?.meaning.trim() ?? '';
+    if (enrichedMeaning.isNotEmpty) {
+      return _firstReadablePortion(enrichedMeaning);
     }
-    return _firstReadablePortion(interpretation);
+    final localMeaning = verse.cleanMeaning.trim();
+    if (localMeaning.isNotEmpty) {
+      return _firstReadablePortion(localMeaning);
+    }
+    return profile.meaning;
   }
 
   static String _reflectionFor(
@@ -325,17 +377,17 @@ const _profiles = <String, _AskTopicProfile>{
   'anxiety': _AskTopicProfile(
     topic: 'anxiety',
     intent: EmotionalIntent.anxiety,
-    verseIds: ['2.47', '2.48', '2.14'],
+    verseIds: ['2.47', '9.22', '2.48', '2.14'],
     searchTerms: 'anxiety worry future action outcome steadiness peace',
     opening:
         'For this worry, give yourself permission to handle only the next step.',
     guidance:
-        'You do not need to solve your whole future today. Bring your attention back to the next honest action. Anxiety softens when the mind stops trying to carry every possible outcome at once.',
+        'Bring your attention back to the next honest action. The Gita encourages steady effort while allowing tomorrow to unfold one step at a time. Anxiety softens when the mind stops trying to carry every possible outcome at once.',
     meaning:
         'Your responsibility is sincere effort. The result matters, but it is not fully in your hands.',
     reflection:
-        'A worried mind often asks for certainty before it will rest. Careful action gives the heart something honest to stand on. Let the grip soften after you have done your part.',
-    practice: 'Release one unnecessary worry today.',
+        'A worried mind often asks for certainty before it will rest. After reading this, ask what is truly yours to do and what belongs to time, grace, and other people. Let the grip soften after you have done your part.',
+    practice: 'Write one worry down, then do the next useful step.',
   ),
   'uncertainty': _AskTopicProfile(
     topic: 'uncertainty',
@@ -344,12 +396,12 @@ const _profiles = <String, _AskTopicProfile>{
     searchTerms: 'uncertainty future choice action wisdom outcome',
     opening: 'You are allowed to move without seeing the whole road.',
     guidance:
-        'Uncertainty does not mean you are lost. It means the next step matters more than the whole map. Choose the clearest duty in front of you and do it with steadiness.',
+        'Uncertainty does not mean you are lost. It means the next step matters more than the whole map. Choose the clearest duty in front of you and do it without demanding that the entire future explain itself first.',
     meaning:
         'Clarity grows through thoughtful action. You are not asked to control every condition before beginning.',
     reflection:
-        'When the future is unclear, the present becomes sacred ground. One careful step is enough for today.',
-    practice: 'Take one clear next step.',
+        'When the future is unclear, the present becomes sacred ground. After reading this, notice whether you are waiting for perfect certainty before doing the simple good that is already visible.',
+    practice: 'Choose one clear next step and do it for ten minutes.',
   ),
   'fear': _AskTopicProfile(
     topic: 'fear',
@@ -359,12 +411,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'Fear is asking for safety; meet it without handing it your worth.',
     guidance:
-        'Fear of failure makes the result feel larger than the action. Do what is yours with care, without making your worth depend on the outcome. Courage can be quiet and still be real.',
+        'Fear of failure makes the result feel larger than the action. Do what is yours with care, without making your worth depend on the outcome. Courage can be quiet: one sincere attempt, one lesson learned, one step taken.',
     meaning:
         'Act with steadiness and let success or failure lose some of its power over your peace.',
     reflection:
-        'Failure is painful, but fear often hurts before anything has happened. Return to effort, learning, and humility.',
-    practice: 'Focus on effort, not outcome.',
+        'Failure is painful, but fear often hurts before anything has happened. After reading this, separate your dignity from the result. Let effort, learning, and humility be enough for today.',
+    practice: 'Name the effort you control, then begin there.',
   ),
   'anger': _AskTopicProfile(
     topic: 'anger',
@@ -374,12 +426,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'Your anger deserves attention, but it does not need to choose your words.',
     guidance:
-        'Before responding, allow the emotion to settle. A reaction may feel necessary in the moment, but clarity grows in the pause. Protect your peace before you choose your words.',
+        'Before responding, allow the emotion to settle. A reaction may feel necessary in the moment, but clarity grows in the pause. Protect your peace before you choose words you may have to repair later.',
     meaning:
         'When anger is fed, judgment becomes clouded. A pause gives wisdom room to return.',
     reflection:
-        'Anger may point to pain, fear, or a blocked expectation. Listening inward first can prevent harm outward.',
-    practice: 'Pause before responding.',
+        'Anger may point to pain, fear, or a blocked expectation. After reading this, ask what the anger is protecting before you let it speak for you.',
+    practice: 'Wait one breath before replying to one tense moment.',
   ),
   'attachment': _AskTopicProfile(
     topic: 'attachment',
@@ -388,12 +440,12 @@ const _profiles = <String, _AskTopicProfile>{
     searchTerms: 'attachment results fruit action karma detachment',
     opening: 'It is possible to care deeply and still loosen your grip.',
     guidance:
-        'You can care deeply without clinging tightly. Give the action your full sincerity, then let the result arrive in its own time. Peace grows when effort is steady and expectation softens.',
+        'You can care deeply without clinging tightly. Give the action your full sincerity, then let the result arrive in its own time. Peace grows when effort is steady and expectation no longer controls your breath.',
     meaning:
         'The work is yours to offer; the result is shaped by many forces beyond you.',
     reflection:
-        'Attachment often hides inside good intentions. Let the action be complete in itself.',
-    practice: 'Complete one duty without checking results.',
+        'Attachment often hides inside good intentions. After reading this, notice where care has become control, and let the action be complete in itself.',
+    practice: 'Finish one duty before checking how it was received.',
   ),
   'discipline': _AskTopicProfile(
     topic: 'discipline',
@@ -403,12 +455,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'If motivation feels absent, begin smaller instead of judging yourself.',
     guidance:
-        'Do not wait until motivation feels perfect. Begin with one small act and let steadiness build from repetition. The mind becomes stronger when it is guided gently and consistently.',
+        'Do not wait until motivation feels perfect. Begin with one small act and let steadiness build from repetition. The mind becomes stronger when it is guided gently, not scolded into movement.',
     meaning:
         'You can lift yourself through patient effort. Small disciplined actions change the direction of the mind.',
     reflection:
-        'Discipline is not harshness. It is a quiet promise kept again and again.',
-    practice: 'Do one focused task for 15 minutes.',
+        'Discipline is not harshness. After reading this, think about the smallest promise you can keep without drama and repeat it with respect for yourself.',
+    practice: 'Give one action your full attention for fifteen minutes.',
   ),
   'motivation': _AskTopicProfile(
     topic: 'motivation',
@@ -422,8 +474,8 @@ const _profiles = <String, _AskTopicProfile>{
     meaning:
         'Action taken with sincerity can lift the mind even when enthusiasm is weak.',
     reflection:
-        'Waiting to feel ready can become another form of avoidance. One honest beginning is often enough to change the day.',
-    practice: 'Start with five sincere minutes.',
+        'Waiting to feel ready can become another form of avoidance. After reading this, let one honest beginning matter more than the mood you wish you had.',
+    practice: 'Start one avoided task for five sincere minutes.',
   ),
   'purpose': _AskTopicProfile(
     topic: 'purpose',
@@ -433,12 +485,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'When purpose feels unclear, start with the responsibility that is closest.',
     guidance:
-        'Purpose is often found by serving the duty nearest to you with honesty. You do not need a perfect life plan before acting well. Begin where your responsibility and sincerity meet.',
+        'Purpose is often found by serving the duty nearest to you with honesty. You do not need a perfect life plan before acting well. Begin where your responsibility, gifts, and sincerity meet.',
     meaning:
         'Your path becomes clearer when you honor your own duty instead of comparing it with someone else\'s.',
     reflection:
-        'A meaningful life is built through faithful actions, not dramatic certainty.',
-    practice: 'Complete one duty with full attention.',
+        'A meaningful life is built through faithful actions, not dramatic certainty. After reading this, ask which responsibility is quietly asking for your best self.',
+    practice: 'Complete the closest duty with full attention.',
   ),
   'mind': _AskTopicProfile(
     topic: 'self-mastery',
@@ -448,12 +500,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'A restless mind does not mean you are failing; it means practice has begun.',
     guidance:
-        'Do not fight every thought as if it were an enemy. Notice where the mind has gone and bring it back with patience. Each return strengthens your inner freedom.',
+        'Do not fight every thought as if it were an enemy. Notice where the mind has gone and bring it back with patience. Each return strengthens your inner freedom more than self-criticism ever could.',
     meaning:
         'The mind is trained by gentle return. Wandering is expected; coming back is the practice.',
     reflection:
-        'Peace is built through repeated return, not through perfect stillness. Treat the mind firmly, but without cruelty.',
-    practice: 'Return your attention without self-blame.',
+        'Peace is built through repeated return, not through perfect stillness. After reading this, think of self-control as returning to what you value, not punishing yourself for wandering.',
+    practice: 'Return your attention once without self-blame.',
   ),
   'devotion': _AskTopicProfile(
     topic: 'devotion',
@@ -463,12 +515,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'Devotion can begin quietly, right inside the next ordinary action.',
     guidance:
-        'Devotion does not have to be loud. It can appear as kindness, humility, and trust in ordinary moments. Let love shape one action today.',
+        'Devotion does not have to be loud. It can appear as kindness, humility, and trust in ordinary moments. Let love shape one action today without needing anyone to notice.',
     meaning:
         'A devoted heart becomes gentle toward others and less trapped by ego.',
     reflection:
-        'Devotion is not only feeling close to God; it is living with reverence when no one is watching.',
-    practice: 'Offer one quiet act of kindness.',
+        'Devotion is not only feeling close to God; it is living with reverence when no one is watching. After reading this, ask where love can become action.',
+    practice: 'Offer one quiet act of kindness without needing credit.',
   ),
   'grief': _AskTopicProfile(
     topic: 'grief',
@@ -478,12 +530,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'For grief, gentleness is not weakness; it is the right pace for the heart.',
     guidance:
-        'Grief asks for tenderness, not force. Let the pain be present without deciding it must define the whole day. Steadiness can begin as one gentle breath.',
+        'Grief asks for tenderness, not force. Let the pain be present without deciding it must define the whole day. Steadiness can begin as one gentle breath and one ordinary act of care.',
     meaning:
         'Pain changes shape over time. You can meet it with patience instead of fighting every wave.',
     reflection:
-        'Love and loss can sit in the same heart. Moving slowly is still movement.',
-    practice: 'Take one gentle breath before the next task.',
+        'Love and loss can sit in the same heart. After reading this, allow sorrow to be real without concluding that peace is gone forever.',
+    practice: 'Take one gentle breath before the next necessary step.',
   ),
   'relationships': _AskTopicProfile(
     topic: 'relationships',
@@ -493,11 +545,11 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'With someone you care about, steadiness matters as much as being right.',
     guidance:
-        'In relationships, clarity and kindness both matter. Speak from steadiness rather than from the first sharp emotion. A softer response can still be truthful.',
+        'In relationships, clarity and kindness both matter. Speak from steadiness rather than from the first sharp emotion. A softer response can still be truthful, and a boundary can still be compassionate.',
     meaning: 'A mature heart lets go of hatred, pride, and harshness.',
     reflection:
-        'The goal is not to win every exchange. The goal is to act without losing yourself.',
-    practice: 'Choose gentleness in one conversation.',
+        'The goal is not to win every exchange. After reading this, ask how to protect truth without letting pride lead the conversation.',
+    practice: 'Choose one gentle sentence in a difficult conversation.',
   ),
   'work': _AskTopicProfile(
     topic: 'work pressure',
@@ -507,12 +559,12 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'When work feels overwhelming, shrink the day to one clear responsibility.',
     guidance:
-        'When work feels heavy, reduce the field of attention. You do not have to carry the whole burden at once. Give one task your full presence, then move to the next.',
+        'When work feels heavy, reduce the field of attention. You do not have to carry the whole burden at once. Give one action your full presence, then move to the next without turning pressure into panic.',
     meaning:
         'Action is necessary, but it becomes lighter when done steadily and without panic.',
     reflection:
-        'Pressure scatters the mind by making everything feel equally important. Peace returns through one clear priority.',
-    practice: 'Finish one task before starting another.',
+        'Pressure scatters the mind by making everything feel equally important. After reading this, choose the one priority that would make the next hour cleaner.',
+    practice: 'Finish one small work action before opening another.',
   ),
   'peace': _AskTopicProfile(
     topic: 'peace',
@@ -522,12 +574,27 @@ const _profiles = <String, _AskTopicProfile>{
     opening:
         'If you are seeking peace, begin by making this moment less crowded.',
     guidance:
-        'Peace is not found by forcing every feeling away. It grows when the mind stops chasing and resisting so intensely. Start by making one moment simpler.',
+        'Peace is not found by forcing every feeling away. It grows when the mind stops chasing and resisting so intensely. Start by making one moment simpler and less crowded.',
     meaning:
         'A steady mind is less disturbed by passing desires, fears, and reactions.',
     reflection:
-        'Peace often begins as restraint: not feeding every thought, not answering every pull.',
-    practice: 'Sit quietly for three slow breaths.',
+        'Peace often begins as restraint: not feeding every thought, not answering every pull. After reading this, notice which desire or fear is asking for too much attention.',
+    practice: 'Sit quietly for three slow breaths before reacting.',
+  ),
+  'suffering': _AskTopicProfile(
+    topic: 'suffering',
+    intent: EmotionalIntent.grief,
+    verseIds: ['2.14', '2.20', '18.66'],
+    searchTerms: 'suffering pain sorrow endurance change peace refuge',
+    opening:
+        'Suffering deserves tenderness before it is asked to become wisdom.',
+    guidance:
+        'Do not rush to explain your pain while you are still carrying it. The Gita points toward steadiness in the middle of changing experiences, not denial of them. Let this moment be met with patience, help where it is needed, and one small act of care.',
+    meaning:
+        'Painful seasons arise and pass. The deeper self is not reduced to the difficulty of this moment.',
+    reflection:
+        'After reading this, ask what part of the pain needs comfort, what part needs wise action, and what part must simply be endured gently today.',
+    practice: 'Name the pain, then do one caring action today.',
   ),
   'fallback': _AskTopicProfile(
     topic: 'general guidance',
@@ -542,6 +609,6 @@ const _profiles = <String, _AskTopicProfile>{
         'Sincere action becomes clearer when it is joined with inner steadiness.',
     reflection:
         'A spiritual answer does not remove responsibility; it helps you carry it with a clearer mind.',
-    practice: 'Do the next right thing calmly.',
+    practice: 'Do the next right thing calmly for ten minutes.',
   ),
 };

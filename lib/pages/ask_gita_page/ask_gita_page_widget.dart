@@ -16,6 +16,19 @@
 /// - GitaRepository for verified local verse translations.
 /// - LocalStorageService for private local history.
 ///
+/// User flow:
+/// A user brings one concern, receives one relevant verse, reflects on what it
+/// means, and leaves with one practice to try today. Suggested questions and
+/// typed questions use the same deterministic local service.
+///
+/// Answer contract:
+/// 1. Gentle Guidance
+/// 2. Relevant Verse
+/// 3. Meaning
+/// 4. Reflection
+/// 5. Practice Today
+/// 6. Source
+///
 /// Notes:
 /// The goal is practical wisdom, not chatbot conversation. This screen avoids
 /// OpenAI, Firebase, and backend calls so guidance remains private, reviewable,
@@ -54,6 +67,8 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
 
   AskGitaLiteAnswer? _guidance;
   String? _emptyMessage;
+  String? _selectedQuestion;
+  bool _hasQuestionText = false;
   bool _isLoading = false;
 
   static const _suggestedQuestions = [
@@ -70,24 +85,74 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
     final initialQuestion = widget.initialQuestion?.trim();
     if (initialQuestion != null && initialQuestion.isNotEmpty) {
       _questionController.text = initialQuestion;
+      _selectedQuestion = initialQuestion;
+      _hasQuestionText = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _askQuestion(initialQuestion);
+          _generateAnswer(initialQuestion);
         }
       });
     }
+    _questionController.addListener(_handleQuestionTextChanged);
   }
 
   @override
   void dispose() {
+    _questionController.removeListener(_handleQuestionTextChanged);
     _questionController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _askQuestion([String? overrideQuestion]) async {
-    final question = (overrideQuestion ?? _questionController.text).trim();
-    if (question.isEmpty || _isLoading) {
+  void _handleQuestionTextChanged() {
+    final hasQuestionText = _questionController.text.trim().isNotEmpty;
+    if (hasQuestionText == _hasQuestionText) {
+      return;
+    }
+    setState(() {
+      _hasQuestionText = hasQuestionText;
+    });
+  }
+
+  void _selectSuggestedQuestion(String question) {
+    debugPrint('AskGita suggested question tapped: $question');
+    _questionController.value = TextEditingValue(
+      text: question,
+      selection: TextSelection.collapsed(offset: question.length),
+    );
+    setState(() {
+      _selectedQuestion = question;
+      _hasQuestionText = question.trim().isNotEmpty;
+      _emptyMessage = null;
+    });
+  }
+
+  Future<void> _submitQuestion() async {
+    debugPrint('AskGita send tapped');
+    if (_isLoading) {
+      return;
+    }
+
+    final question = _questionController.text.trim();
+    debugPrint('AskGita resolved question text: $question');
+    if (question.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a question.')),
+      );
+      return;
+    }
+
+    if (_selectedQuestion != null && _selectedQuestion != question) {
+      setState(() {
+        _selectedQuestion = null;
+      });
+    }
+
+    await _generateAnswer(question);
+  }
+
+  Future<void> _generateAnswer(String question) async {
+    if (_isLoading) {
       return;
     }
 
@@ -112,6 +177,7 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
         _guidance = guidance;
         _isLoading = false;
       });
+      debugPrint('AskGita answer generated: ${guidance.source}');
       await LocalStorageService.recordAskGitaHistory(
         question: question,
         answer: guidance.gentleGuidance,
@@ -191,9 +257,9 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
                   _SuggestedQuestionGrid(
                     questions: _suggestedQuestions,
                     isDisabled: _isLoading,
+                    selectedQuestion: _selectedQuestion,
                     onTap: (question) {
-                      _questionController.text = question;
-                      _askQuestion(question);
+                      _selectSuggestedQuestion(question);
                     },
                   ),
                   const SizedBox(height: 22),
@@ -219,7 +285,8 @@ class _AskGitaPageWidgetState extends State<AskGitaPageWidget> {
             _QuestionComposer(
               controller: _questionController,
               isLoading: _isLoading,
-              onSubmit: _askQuestion,
+              hasQuestionText: _hasQuestionText,
+              onSubmit: _submitQuestion,
             ),
           ],
         ),
@@ -251,9 +318,8 @@ class _AskHeader extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               const IconMedallion(
-                icon: Icons.music_note_rounded,
+                icon: Icons.self_improvement_rounded,
                 size: 50,
-                backgroundColor: kGold,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -263,7 +329,7 @@ class _AskHeader extends StatelessWidget {
                     Text('Ask Gita', style: gitaTitle(28)),
                     const SizedBox(height: 4),
                     Text(
-                      'Receive Gita-inspired guidance for daily life.',
+                      'Bring what you are carrying. Read with calm attention.',
                       style: gitaBody(color: kText, size: 14),
                     ),
                   ],
@@ -286,7 +352,7 @@ class _AskHeader extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Gita Wisdom provides Bhagavad Gita-inspired reflections for spiritual learning. It is not medical, legal, financial, or mental health advice.',
+                    'These reflections support spiritual learning from the Bhagavad Gita. They are not medical, legal, financial, or mental health advice.',
                     style: gitaBody(
                       color: kText,
                       size: 13,
@@ -307,11 +373,13 @@ class _SuggestedQuestionGrid extends StatelessWidget {
   const _SuggestedQuestionGrid({
     required this.questions,
     required this.isDisabled,
+    required this.selectedQuestion,
     required this.onTap,
   });
 
   final List<String> questions;
   final bool isDisabled;
+  final String? selectedQuestion;
   final ValueChanged<String> onTap;
 
   @override
@@ -324,17 +392,17 @@ class _SuggestedQuestionGrid extends StatelessWidget {
           Row(
             children: [
               const Icon(Icons.lightbulb_outline_rounded,
-                  color: kGold, size: 19),
+                  color: kSoftGold, size: 19),
               const SizedBox(width: 8),
               Text(
-                'Suggested questions',
+                'Begin with one question',
                 style: gitaBody(color: kText, weight: FontWeight.w900),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'Choose a question, then read the answer slowly.',
+            'Choose one, then read slowly.',
             style: gitaBody(color: kMuted, size: 13),
           ),
           const SizedBox(height: 14),
@@ -354,6 +422,7 @@ class _SuggestedQuestionGrid extends StatelessWidget {
                       child: _SuggestedQuestionChip(
                         question: question,
                         isDisabled: isDisabled,
+                        isSelected: selectedQuestion == question,
                         onTap: () => onTap(question),
                       ),
                     ),
@@ -371,11 +440,13 @@ class _SuggestedQuestionChip extends StatelessWidget {
   const _SuggestedQuestionChip({
     required this.question,
     required this.isDisabled,
+    required this.isSelected,
     required this.onTap,
   });
 
   final String question;
   final bool isDisabled;
+  final bool isSelected;
   final VoidCallback onTap;
 
   @override
@@ -398,11 +469,19 @@ class _SuggestedQuestionChip extends StatelessWidget {
             ],
           ),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: kGold.withValues(alpha: 0.18)),
+          border: Border.all(
+            color: isSelected
+                ? kSoftGold.withValues(alpha: 0.40)
+                : kGold.withValues(alpha: 0.14),
+          ),
         ),
         child: Row(
           children: [
-            const Icon(Icons.spa_rounded, color: kGold, size: 18),
+            Icon(
+              Icons.spa_rounded,
+              color: isSelected ? kSoftGold : kMuted,
+              size: 18,
+            ),
             const SizedBox(width: 9),
             Expanded(
               child: Text(
@@ -425,11 +504,13 @@ class _QuestionComposer extends StatelessWidget {
   const _QuestionComposer({
     required this.controller,
     required this.isLoading,
+    required this.hasQuestionText,
     required this.onSubmit,
   });
 
   final TextEditingController controller;
   final bool isLoading;
+  final bool hasQuestionText;
   final VoidCallback onSubmit;
 
   @override
@@ -446,11 +527,11 @@ class _QuestionComposer extends StatelessWidget {
           decoration: BoxDecoration(
             color: kCard.withValues(alpha: 0.98),
             borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: kGold.withValues(alpha: 0.22)),
+            border: Border.all(color: kGold.withValues(alpha: 0.14)),
             boxShadow: [
               BoxShadow(
-                color: kGold.withValues(alpha: 0.12),
-                blurRadius: 26,
+                color: kDeepBrinjal.withValues(alpha: 0.18),
+                blurRadius: 20,
                 offset: const Offset(0, 12),
               ),
             ],
@@ -465,18 +546,18 @@ class _QuestionComposer extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: kDeepBrinjal,
-                  border: Border.all(color: kGold.withValues(alpha: 0.42)),
+                  border: Border.all(color: kGold.withValues(alpha: 0.22)),
                   boxShadow: [
                     BoxShadow(
-                      color: kGold.withValues(alpha: 0.18),
-                      blurRadius: 18,
+                      color: kDeepBrinjal.withValues(alpha: 0.20),
+                      blurRadius: 14,
                       offset: const Offset(0, 8),
                     ),
                   ],
                 ),
                 child: const Icon(
-                  Icons.music_note_rounded,
-                  color: kGold,
+                  Icons.self_improvement_rounded,
+                  color: kSoftGold,
                   size: 19,
                 ),
               ),
@@ -491,7 +572,7 @@ class _QuestionComposer extends StatelessWidget {
                   style: gitaBody(color: kDarkText, size: 16),
                   onSubmitted: (_) => onSubmit(),
                   decoration: InputDecoration(
-                    hintText: 'Ask about peace, duty, fear, purpose...',
+                    hintText: 'What are you carrying today?',
                     hintStyle: gitaBody(
                       color: kDarkText.withValues(alpha: 0.58),
                       size: 13,
@@ -520,12 +601,23 @@ class _QuestionComposer extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              AnimatedGoldIconButton(
-                icon: Icons.send_rounded,
-                isBusy: isLoading,
-                tooltip: 'Ask Gita',
-                backgroundColor: isLoading ? kCard2 : null,
-                onTap: onSubmit,
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, _) {
+                  final canSend =
+                      hasQuestionText || value.text.trim().isNotEmpty;
+                  final visuallyEnabled = canSend && !isLoading;
+                  return Opacity(
+                    opacity: visuallyEnabled ? 1 : 0.58,
+                    child: AnimatedGoldIconButton(
+                      icon: Icons.send_rounded,
+                      isBusy: isLoading,
+                      tooltip: 'Send',
+                      backgroundColor: visuallyEnabled ? null : kCard2,
+                      onTap: isLoading ? null : onSubmit,
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -555,7 +647,7 @@ class _ReflectionLoadingCard extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Text(
-              'Reflecting on the Gita...',
+              'Opening a steady verse...',
               style: gitaBody(color: kText, weight: FontWeight.w900),
             ),
           ),
@@ -649,7 +741,7 @@ class _GuidanceResultCard extends StatelessWidget {
             const SizedBox(height: 20),
             _GuidanceSection(
               icon: Icons.lightbulb_outline_rounded,
-              title: 'Gita Wisdom Interpretation',
+              title: 'Meaning',
               child: Text(
                 guidance.meaning,
                 style:
@@ -683,13 +775,26 @@ class _GuidanceResultCard extends StatelessWidget {
             _GuidanceSection(
               icon: Icons.spa_rounded,
               title: 'Practice Today',
-              child: Text(
-                guidance.practiceToday,
-                style: gitaBody(
-                  color: kDarkText,
-                  size: 16,
-                  weight: FontWeight.w800,
-                ).copyWith(height: 1.58),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    guidance.practiceToday,
+                    style: gitaBody(
+                      color: kDarkText,
+                      size: 16,
+                      weight: FontWeight.w800,
+                    ).copyWith(height: 1.58),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Return to this once today when the same feeling appears.',
+                    style: gitaTransliteration(
+                      color: kRoyalPurple.withValues(alpha: 0.78),
+                      size: 14,
+                    ).copyWith(height: 1.45),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),

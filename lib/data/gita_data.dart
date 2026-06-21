@@ -175,6 +175,18 @@ class GitaVerse {
   String get english => englishTranslation;
   String get commentary => meaning;
   String get cleanMeaning => cleanLocalMeaning(meaning);
+  VerseEnrichment? get enrichment {
+    final content = ContentQualityFramework.contentForVerse(id);
+    if (content == null) {
+      return null;
+    }
+    final sourceMeaning =
+        cleanMeaning.isNotEmpty ? cleanMeaning : englishTranslation.trim();
+    return content.toEnrichment(meaning: sourceMeaning);
+  }
+
+  bool get hasEnrichment => enrichment?.isComplete ?? false;
+
   String get gitaWisdomInterpretation {
     final reviewed = ContentQualityFramework.interpretationForVerse(id);
     if (reviewed != null) {
@@ -287,7 +299,7 @@ String cleanLocalMeaning(String source) {
 
 bool _containsArchaicDevotionalPronouns(String source) {
   return RegExp(
-    r'\b(thy|thee|thou|hath|dost|shalt|whence|thereof)\b',
+    r'\b(thy|thee|thou|hath|dost|shalt|ye|whence|wherefore|thereof|thine)\b',
     caseSensitive: false,
   ).hasMatch(source);
 }
@@ -324,6 +336,8 @@ class GitaDataBundle {
 
   int get chapterCount => chapters.length;
   int get verseCount => verses.length;
+  int get enrichedVerseCount =>
+      verses.where((verse) => verse.hasEnrichment).length;
 
   GitaVerse? verseById(String id) => versesById[id];
   GitaChapterData? chapterByNumber(int chapterNumber) =>
@@ -604,6 +618,13 @@ class GitaDataService {
       throw StateError(
         'Expected $expectedVerseCount Gita verses in $assetPath, '
         'found ${bundle.verseCount}.',
+      );
+    }
+    final duplicateEnrichments =
+        ContentQualityFramework.duplicateVerseEnrichmentIds();
+    if (duplicateEnrichments.isNotEmpty) {
+      throw StateError(
+        'Duplicate verse enrichments found: ${duplicateEnrichments.join(', ')}.',
       );
     }
     for (final chapter in bundle.chapters) {
@@ -907,7 +928,9 @@ class GitaRepository {
       final sanskritText = verse.sanskrit.toLowerCase();
       final transliterationText = verse.transliteration.toLowerCase();
       final translationText = verse.englishTranslation.toLowerCase();
-      final meaningText = verse.gitaWisdomInterpretation.toLowerCase();
+      final meaningText =
+          (verse.enrichment?.meaning ?? verse.cleanMeaning).toLowerCase();
+      final interpretationText = verse.gitaWisdomInterpretation.toLowerCase();
       final reflectionText = verse.reflectionText.toLowerCase();
       final practiceText = verse.practiceToday.toLowerCase();
       final tagText = verse.allTags.join(' ').toLowerCase();
@@ -924,6 +947,7 @@ class GitaRepository {
         transliterationText,
         translationText,
         meaningText,
+        interpretationText,
         reflectionText,
         practiceText,
         tagText,
@@ -933,11 +957,12 @@ class GitaRepository {
       // Ranking priority:
       // 1. exact chapter/verse references
       // 2. emotional tag matches
-      // 3. Gita Wisdom Interpretation (stored as meaning)
-      // 4. reflection text
-      // 5. Practice Today
-      // 6. scripture translation
-      // 7. transliteration / Sanskrit matches
+      // 3. source meaning/commentary
+      // 4. Gita Wisdom Interpretation
+      // 5. reflection text
+      // 6. Practice Today
+      // 7. scripture translation
+      // 8. transliteration / Sanskrit matches
       var rankingScore = 0;
       final exactReferenceMatch = normalizedQuery == verse.id ||
           normalizedQuery == '${verse.chapterNumber}.${verse.verseNumber}' ||
@@ -957,6 +982,9 @@ class GitaRepository {
       if (meaningText.contains(normalizedQuery)) {
         rankingScore += 56;
       }
+      if (interpretationText.contains(normalizedQuery)) {
+        rankingScore += 54;
+      }
       if (reflectionText.contains(normalizedQuery)) {
         rankingScore += 48;
       }
@@ -972,7 +1000,9 @@ class GitaRepository {
       } else if (originalTerms.isNotEmpty &&
           originalTerms.every(
             (term) =>
-                translationText.contains(term) || meaningText.contains(term),
+                translationText.contains(term) ||
+                meaningText.contains(term) ||
+                interpretationText.contains(term),
           )) {
         rankingScore += 28;
       }
@@ -987,6 +1017,9 @@ class GitaRepository {
           rankingScore += 15;
         }
         if (meaningText.contains(term)) {
+          rankingScore += 11;
+        }
+        if (interpretationText.contains(term)) {
           rankingScore += 11;
         }
         if (reflectionText.contains(term)) {

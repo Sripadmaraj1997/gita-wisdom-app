@@ -29,7 +29,6 @@ from elevenlabs.types import VoiceSettings
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT_DIR = ROOT / "assets" / "data" / "gita"
 DEFAULT_OUTPUT_DIR = ROOT / "assets" / "audio" / "english"
-DEFAULT_AMBIENCE_PATH = ROOT / "assets" / "audio" / "flute_intro.mp3"
 
 # Built-in public ElevenLabs voice: Antoni.
 DEFAULT_VOICE_ID = "ErXwobaYiN019PkySvjV"
@@ -106,23 +105,6 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Print planned work without calling ElevenLabs.",
-    )
-    parser.add_argument(
-        "--ambience-path",
-        type=Path,
-        default=DEFAULT_AMBIENCE_PATH,
-        help="Optional soft flute ambience MP3 to mix quietly under narration.",
-    )
-    parser.add_argument(
-        "--no-ambience",
-        action="store_true",
-        help="Disable ambience mixing even if the ambience file exists.",
-    )
-    parser.add_argument(
-        "--ambience-volume-db",
-        type=float,
-        default=-27.0,
-        help="Ambience gain in dB. Lower is quieter. Default: -27.0.",
     )
     return parser.parse_args()
 
@@ -208,43 +190,14 @@ def narration_text(chapter_number: int, verse_number: int, translation: str) -> 
     return f"Chapter {chapter_number}, Verse {verse_number}...\n\n{paced_translation}"
 
 
-def mix_with_ambience(
-    narration_path: Path,
-    output_path: Path,
-    ambience_path: Path,
-    ambience_volume_db: float,
-) -> None:
-    try:
-        from pydub import AudioSegment
-    except ImportError as error:
-        raise RuntimeError(
-            "pydub is required for ambience mixing. Install with: pip3 install pydub"
-        ) from error
-
-    narration = AudioSegment.from_file(narration_path)
-    ambience = AudioSegment.from_file(ambience_path)
-    if len(ambience) < len(narration):
-        loops = (len(narration) // len(ambience)) + 1
-        ambience = ambience * loops
-
-    ambience = ambience[: len(narration)].fade_in(900).fade_out(1400)
-    ambience = ambience + ambience_volume_db
-    mixed = narration.overlay(ambience)
-    mixed.export(output_path, format="mp3", bitrate="128k")
-
-
-
 def write_audio_file(
     client: ElevenLabs,
     output_path: Path,
     text: str,
     voice_id: str,
     model_id: str,
-    ambience_path: Path | None,
-    ambience_volume_db: float,
 ) -> None:
     temp_path = output_path.with_suffix(".tts.tmp.mp3")
-    mixed_temp_path = output_path.with_suffix(".mixed.tmp.mp3")
     audio_stream = client.text_to_speech.convert(
         voice_id=voice_id,
         model_id=model_id,
@@ -266,24 +219,10 @@ def write_audio_file(
                     handle.write(chunk)
         if temp_path.stat().st_size == 0:
             raise RuntimeError("ElevenLabs returned an empty audio file.")
-        if ambience_path and ambience_path.exists():
-            mix_with_ambience(
-                narration_path=temp_path,
-                output_path=mixed_temp_path,
-                ambience_path=ambience_path,
-                ambience_volume_db=ambience_volume_db,
-            )
-            if mixed_temp_path.stat().st_size == 0:
-                raise RuntimeError("Ambience mix returned an empty audio file.")
-            mixed_temp_path.replace(output_path)
-            temp_path.unlink()
-        else:
-            temp_path.replace(output_path)
+        temp_path.replace(output_path)
     except Exception:
         if temp_path.exists():
             temp_path.unlink()
-        if mixed_temp_path.exists():
-            mixed_temp_path.unlink()
         raise
 
 
@@ -363,8 +302,6 @@ def generate_for_chapter(
                 text=text,
                 voice_id=args.voice_id,
                 model_id=args.model_id,
-                ambience_path=None if args.no_ambience else args.ambience_path,
-                ambience_volume_db=args.ambience_volume_db,
             )
         except Exception as error:  # noqa: BLE001 - CLI should keep running.
             print(f"ERROR: {label} failed: {error}", file=sys.stderr)
@@ -406,15 +343,7 @@ def main() -> int:
     print(f"Output MP3: {args.output_dir}")
     print(f"Voice ID: {args.voice_id}")
     print(f"Model ID: {args.model_id}")
-    if args.no_ambience:
-        print("Ambience: disabled")
-    elif args.ambience_path.exists():
-        print(
-            f"Ambience: {args.ambience_path} "
-            f"({args.ambience_volume_db:g} dB under narration)"
-        )
-    else:
-        print(f"Ambience: not found at {args.ambience_path}; narration only")
+    print("Audio: narration only")
     if args.dry_run:
         print("Mode: dry run, no API calls will be made.")
     if args.all:

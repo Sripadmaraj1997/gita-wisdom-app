@@ -9,7 +9,7 @@
 ///   Ask Gita topics, emotional searches, journal activity, and completed
 ///   Journeys.
 /// - Convert signals into spiritual theme counts such as peace, fear,
-///   attachment, discipline, purpose, clarity, devotion, compassion, and service.
+///   anger, discipline, purpose, devotion, clarity, attachment, and compassion.
 /// - Personalize Today's Guidance and quiet Home recommendations.
 ///
 /// Architecture:
@@ -131,13 +131,12 @@ class PersonalizationService {
     'peace',
     'fear',
     'anger',
-    'attachment',
     'discipline',
     'purpose',
-    'clarity',
     'devotion',
+    'clarity',
+    'attachment',
     'compassion',
-    'service',
   ];
 
   static const _seekingKey = 'gita_wisdom_personalization_seeking';
@@ -219,6 +218,15 @@ class PersonalizationService {
     await recordThemes([canonical], weight: 2);
   }
 
+  static Future<void> recordAskGitaQuestion(String question) async {
+    final matchedThemes = _themesForText(question);
+    if (matchedThemes.isEmpty) {
+      return;
+    }
+    await _rememberValue(_askTopicsKey, matchedThemes.first, limit: 25);
+    await recordThemes(matchedThemes, weight: 2);
+  }
+
   static Future<void> recordEmotionalSearch(String query) async {
     final matchedThemes = _themesForText(query);
     if (matchedThemes.isEmpty) {
@@ -231,6 +239,54 @@ class PersonalizationService {
   static Future<void> recordJourneyCompleted(String journeyId) async {
     await _rememberValue(_completedJourneySignalsKey, journeyId, limit: 20);
     await recordThemes(_themesForJourney(journeyId), weight: 3);
+  }
+
+  static Future<List<GitaVerseData>> recommendedVerses({
+    int limit = 4,
+  }) async {
+    final profile = await interestProfile();
+    if (!profile.hasSignals) {
+      return const [];
+    }
+    final openedIds = await _rememberedValues(_openedVersesKey);
+    final selected = <String, GitaVerseData>{};
+    for (final topic in _guidanceTopicsFor(profile.topThemes)) {
+      final verses = await _recommendedVersesFor(topic, limit: limit + 4);
+      for (final verse in verses) {
+        if (openedIds.contains(verse.id)) {
+          continue;
+        }
+        selected[verse.id] = verse;
+        if (selected.length >= limit) {
+          return selected.values.toList(growable: false);
+        }
+      }
+    }
+    return selected.values.take(limit).toList(growable: false);
+  }
+
+  static Future<List<String>> suggestedJourneyIds({
+    Iterable<String> excludeJourneyIds = const [],
+  }) async {
+    const fallback = [
+      'journey_discipline_14',
+      'journey_karma_yoga_14',
+      'journey_anxiety_7',
+      'journey_clarity_21',
+      'journey_peace_7',
+    ];
+    final excluded = excludeJourneyIds.toSet();
+    final profile = await interestProfile();
+    final suggested = <String>[];
+    if (profile.hasSignals) {
+      for (final theme in profile.topThemes) {
+        suggested.addAll(_journeysForTheme(theme));
+      }
+    }
+    suggested.addAll(fallback);
+    return _dedupe(suggested)
+        .where((id) => !excluded.contains(id))
+        .toList(growable: false);
   }
 
   static Future<void> recordThemes(
@@ -317,8 +373,8 @@ class PersonalizationService {
       recommendations.add(
         const PersonalizedRecommendation(
           title: 'Journey of Discipline',
-          subtitle: 'A steady next path after peace.',
-          reason: 'You completed Journey to Peace.',
+          subtitle: 'Turn yesterday\'s peace into one steady habit.',
+          reason: 'Continue what you began',
           journeyId: 'journey_discipline_14',
         ),
       );
@@ -337,6 +393,22 @@ class PersonalizationService {
             verseId: verse.id,
           ),
         );
+      }
+    }
+
+    if (recommendations.length < limit) {
+      final journeyIds = await suggestedJourneyIds();
+      for (final journeyId in journeyIds) {
+        if (completedJourneys.contains(journeyId)) {
+          continue;
+        }
+        final journey = _journeyRecommendationFor(journeyId);
+        if (journey != null) {
+          recommendations.add(journey);
+        }
+        if (recommendations.length >= limit) {
+          break;
+        }
       }
     }
 
@@ -388,9 +460,9 @@ class PersonalizationService {
       'fear' => const ['peace', 'clarity', 'attachment'],
       'anger' => const ['peace', 'compassion', 'discipline'],
       'attachment' => const ['peace', 'discipline', 'clarity'],
-      'discipline' => const ['focus', 'clarity'],
-      'purpose' => const ['clarity', 'service'],
-      'devotion' => const ['compassion', 'service'],
+      'discipline' => const ['discipline', 'clarity'],
+      'purpose' => const ['clarity', 'discipline'],
+      'devotion' => const ['compassion', 'peace'],
       _ => [canonical],
     };
   }
@@ -473,7 +545,7 @@ class PersonalizationService {
     return switch (journeyId) {
       'journey_peace_7' => const ['peace', 'clarity'],
       'journey_discipline_14' => const ['discipline', 'clarity'],
-      'journey_karma_yoga_14' => const ['service', 'attachment'],
+      'journey_karma_yoga_14' => const ['purpose', 'attachment'],
       'journey_anxiety_7' => const ['fear', 'peace'],
       'journey_clarity_21' => const ['clarity', 'purpose'],
       _ => const [],
@@ -488,8 +560,9 @@ class PersonalizationService {
         'anger' => const ['peace', 'compassion'],
         'attachment' => const ['attachment', 'peace'],
         'discipline' => const ['discipline', 'clarity'],
-        'purpose' => const ['clarity', 'service'],
+        'purpose' => const ['clarity', 'discipline'],
         'devotion' => const ['devotion', 'compassion'],
+        'compassion' => const ['compassion', 'devotion'],
         _ => [theme],
       });
     }
@@ -497,6 +570,14 @@ class PersonalizationService {
   }
 
   static Future<GitaVerseData?> _recommendedVerseFor(String theme) async {
+    final verses = await _recommendedVersesFor(theme, limit: 1);
+    return verses.isEmpty ? null : verses.first;
+  }
+
+  static Future<List<GitaVerseData>> _recommendedVersesFor(
+    String theme, {
+    required int limit,
+  }) async {
     final query = switch (theme) {
       'fear' => 'peace steadiness trust fear uncertainty',
       'anger' => 'anger patience compassion self-control',
@@ -505,26 +586,37 @@ class PersonalizationService {
       'purpose' => 'purpose dharma duty clarity service',
       'devotion' => 'devotion compassion surrender service',
       'compassion' => 'compassion kindness devotion',
-      'service' => 'service duty action karma yoga',
       'clarity' => 'clarity wisdom mind steady',
+      'peace' => 'peace calm steady mind trust',
       _ => 'peace mind steady',
     };
-    final results = await GitaRepository.search(query, limit: 6);
-    return results.isEmpty ? null : results.first.verse;
+    final results = await GitaRepository.search(query, limit: limit + 6);
+    final enriched = [
+      for (final result in results)
+        if (result.verse.hasEnrichment) result.verse,
+    ];
+    final all = [
+      ...enriched,
+      for (final result in results)
+        if (!enriched.any((verse) => verse.id == result.verse.id)) result.verse,
+    ];
+    return {
+      for (final verse in all) verse.id: verse,
+    }.values.take(limit).toList(growable: false);
   }
 
   static String _recommendationSubtitleFor(String theme) {
     return switch (theme) {
-      'fear' => 'A verse for steadiness and trust.',
-      'anger' => 'A verse for patience before response.',
-      'attachment' => 'A verse for effort without clinging.',
-      'discipline' => 'A verse for steady practice.',
-      'purpose' => 'A verse for duty and direction.',
-      'devotion' => 'A verse for quiet devotion.',
-      'compassion' => 'A verse for gentleness.',
-      'service' => 'A verse for sincere action.',
-      'clarity' => 'A verse for a clearer mind.',
-      _ => 'A verse for today.',
+      'fear' => 'Read for steadiness; practice one trusted step.',
+      'anger' => 'Read before reacting; practice one pause.',
+      'attachment' => 'Read for effort; practice releasing one result.',
+      'discipline' => 'Read for steadiness; practice one focused action.',
+      'purpose' => 'Read for direction; practice the duty nearest to you.',
+      'devotion' => 'Read for devotion; practice one sincere offering.',
+      'compassion' => 'Read for gentleness; practice one kinder response.',
+      'clarity' => 'Read for clarity; practice one honest decision.',
+      'peace' => 'Read for calm; practice carrying one insight.',
+      _ => 'Read once; carry one small action.',
     };
   }
 
@@ -607,14 +699,73 @@ class PersonalizationService {
       return 'compassion';
     }
     if (lower.contains('karma') || lower.contains('duty')) {
-      return 'service';
+      return 'purpose';
     }
     return null;
+  }
+
+  static List<String> _journeysForTheme(String theme) {
+    return switch (theme) {
+      'fear' => const ['journey_anxiety_7', 'journey_peace_7'],
+      'anger' => const ['journey_peace_7', 'journey_discipline_14'],
+      'attachment' => const ['journey_karma_yoga_14', 'journey_peace_7'],
+      'discipline' => const ['journey_discipline_14'],
+      'purpose' => const ['journey_karma_yoga_14', 'journey_clarity_21'],
+      'devotion' => const ['journey_karma_yoga_14', 'journey_peace_7'],
+      'clarity' => const ['journey_clarity_21', 'journey_discipline_14'],
+      'compassion' => const ['journey_peace_7', 'journey_karma_yoga_14'],
+      _ => const ['journey_peace_7'],
+    };
+  }
+
+  static PersonalizedRecommendation? _journeyRecommendationFor(
+    String journeyId,
+  ) {
+    return switch (journeyId) {
+      'journey_peace_7' => const PersonalizedRecommendation(
+          title: 'Journey to Peace',
+          subtitle: 'Practice calm through one guided reflection at a time.',
+          reason: 'A path for daily practice',
+          journeyId: 'journey_peace_7',
+        ),
+      'journey_discipline_14' => const PersonalizedRecommendation(
+          title: 'Journey of Discipline',
+          subtitle: 'Build focus through one sincere step each day.',
+          reason: 'A path for daily practice',
+          journeyId: 'journey_discipline_14',
+        ),
+      'journey_karma_yoga_14' => const PersonalizedRecommendation(
+          title: 'Journey of Karma Yoga',
+          subtitle: 'Practice action without clinging to the result.',
+          reason: 'A path for daily practice',
+          journeyId: 'journey_karma_yoga_14',
+        ),
+      'journey_anxiety_7' => const PersonalizedRecommendation(
+          title: 'Journey Through Anxiety',
+          subtitle: 'Return from worry to one grounded step.',
+          reason: 'A path for daily practice',
+          journeyId: 'journey_anxiety_7',
+        ),
+      'journey_clarity_21' => const PersonalizedRecommendation(
+          title: 'Journey to Inner Clarity',
+          subtitle: 'Reflect daily until the next right step becomes clearer.',
+          reason: 'A path for daily practice',
+          journeyId: 'journey_clarity_21',
+        ),
+      _ => null,
+    };
   }
 }
 
 const _themeSynonyms = <String, List<String>>{
-  'peace': ['peace', 'calm', 'steady', 'steadiness', 'restless'],
+  'peace': [
+    'peace',
+    'calm',
+    'steady',
+    'steadiness',
+    'restless',
+    'trust',
+  ],
   'fear': [
     'fear',
     'afraid',
@@ -626,6 +777,8 @@ const _themeSynonyms = <String, List<String>>{
     'uncertainty',
     'uncertain',
     'failure',
+    'stress',
+    'overwhelmed',
   ],
   'anger': ['anger', 'angry', 'rage', 'frustration', 'resentment', 'irritat'],
   'attachment': ['attachment', 'attached', 'result', 'outcome', 'fruit'],
@@ -637,7 +790,19 @@ const _themeSynonyms = <String, List<String>>{
     'self-control',
     'control',
   ],
-  'purpose': ['purpose', 'meaning', 'direction', 'dharma', 'calling'],
+  'purpose': [
+    'purpose',
+    'meaning',
+    'direction',
+    'dharma',
+    'calling',
+    'duty',
+    'karma',
+    'service',
+    'work',
+    'responsibility',
+    'offering',
+  ],
   'clarity': ['clarity', 'wisdom', 'discernment', 'confused', 'decision'],
   'devotion': ['devotion', 'devoted', 'bhakti', 'surrender', 'krishna', 'god'],
   'compassion': [
@@ -648,5 +813,4 @@ const _themeSynonyms = <String, List<String>>{
     'family',
     'friend',
   ],
-  'service': ['service', 'duty', 'karma', 'work', 'responsibility', 'offering'],
 };

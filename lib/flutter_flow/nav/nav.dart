@@ -88,6 +88,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
                 params.getParam<String>('journeyDayTitle', ParamType.String),
             nextJourneyDayTitle: params.getParam<String>(
                 'nextJourneyDayTitle', ParamType.String),
+            source: params.getParam<String>('source', ParamType.String),
           ),
         ),
         FFRoute(
@@ -131,7 +132,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: TransformationPageWidget.routeName,
           path: TransformationPageWidget.routePath,
-          builder: (context, params) => const TransformationPageWidget(),
+          builder: (context, params) => TransformationPageWidget(
+            completedJourneyId:
+                params.getParam<String>('completedJourneyId', ParamType.String),
+            completedJourneyDay:
+                params.getParam<int>('completedJourneyDay', ParamType.int),
+          ),
         ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
@@ -202,12 +208,11 @@ class RouteErrorPage extends StatelessWidget {
 
 extension NavigationExtensions on BuildContext {
   void safePop() {
-    // If there is only one route on the stack, navigate to the initial
-    // page instead of popping.
+    // If there is only one route on the stack, return directly to Home.
     if (canPop()) {
       pop();
     } else {
-      go('/');
+      go('/homePage');
     }
   }
 }

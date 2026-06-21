@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gita_wisdom/data/gita_data.dart';
+import 'package:gita_wisdom/pages/gita_common/gita_common.dart';
 import 'package:gita_wisdom/pages/journal_page/journal_page_widget.dart';
+import 'package:gita_wisdom/pages/saved_verses_page/saved_verses_page_widget.dart';
 import 'package:gita_wisdom/pages/settings_page/settings_page_widget.dart';
 import 'package:gita_wisdom/pages/verse_reader_page/verse_reader_page_widget.dart';
 import 'package:gita_wisdom/services/local_storage_service.dart';
@@ -63,7 +65,7 @@ void main() {
     expect(find.textContaining('karmaṇyevādhikāraste'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
-    expect(find.text('Highlight'), findsOneWidget);
+    expect(find.text('Mark'), findsOneWidget);
 
     await scrollToAndTap(tester, find.text('Save'));
 
@@ -71,7 +73,7 @@ void main() {
         await tester.runAsync(LocalStorageService.savedVerses) ?? const [];
     expect(saved.map((verse) => verse.verseId), contains('2.47'));
 
-    await scrollToAndTap(tester, find.text('Highlight'));
+    await scrollToAndTap(tester, find.text('Mark'));
 
     final highlighted = await tester
         .runAsync(() => LocalStorageService.isVerseHighlighted('2.47'));
@@ -107,9 +109,9 @@ void main() {
     tester,
   ) async {
     await pumpScreen(tester, const JournalPageWidget());
-    await pumpUntilFound(tester, find.text('Create reflection'));
+    await pumpUntilFound(tester, find.text('Begin reflection'));
 
-    await tester.tap(find.text('Create reflection'));
+    await tester.tap(find.text('Begin reflection'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(0), 'QA reflection');
@@ -117,12 +119,8 @@ void main() {
       find.byType(TextField).at(1),
       'A steady action brought more peace today.',
     );
-    await tester.scrollUntilVisible(
-      find.text('Save reflection'),
-      220,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.text('Save reflection'));
+    expect(find.text('Save Reflection'), findsOneWidget);
+    await tester.tap(find.text('Save Reflection'));
     await tester.pumpAndSettle();
 
     expect(find.text('QA reflection'), findsOneWidget);
@@ -140,12 +138,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.edit_rounded).first);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'Edited reflection');
-    await tester.scrollUntilVisible(
-      find.text('Save reflection'),
-      220,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.text('Save reflection'));
+    expect(find.text('Save Reflection'), findsOneWidget);
+    await tester.tap(find.text('Save Reflection'));
     await tester.pumpAndSettle();
 
     expect(find.text('Edited reflection'), findsOneWidget);
@@ -157,14 +151,109 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.delete_outline_rounded).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
+    await tester.tap(find.text('Remove Reflection'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Begin your reflection journey.'), findsOneWidget);
+    expect(find.text('Begin with one honest reflection.'), findsOneWidget);
     expect(
       await tester.runAsync(LocalStorageService.journalEntries) ?? const [],
       isEmpty,
     );
+  });
+
+  testWidgets(
+      'Journal saves guided clarity intention and gratitude after restart', (
+    tester,
+  ) async {
+    await pumpScreen(tester, const JournalPageWidget());
+    await pumpUntilFound(tester, find.text('Begin reflection'));
+
+    await tester.tap(find.text('Begin reflection'));
+    await tester.pumpAndSettle();
+
+    final saveButtonFinder = find.widgetWithText(GoldButton, 'Save Reflection');
+    expect(saveButtonFinder, findsOneWidget);
+    expect(tester.widget<GoldButton>(saveButtonFinder).onPressed, isNull);
+
+    await tester.showKeyboard(find.byType(TextField).at(1));
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(saveButtonFinder, findsOneWidget);
+    await tester.enterText(
+      find.byType(TextField).at(1),
+      'A quiet conversation gave clarity today.',
+    );
+    final intentionField = find.widgetWithText(TextField, 'Intention');
+    await tester.scrollUntilVisible(
+      intentionField,
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.showKeyboard(intentionField);
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(saveButtonFinder, findsOneWidget);
+    await tester.enterText(
+      intentionField,
+      'Carry patience into the next conversation.',
+    );
+    final gratitudeField = find.widgetWithText(TextField, 'Gratitude');
+    await tester.scrollUntilVisible(
+      gratitudeField,
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.showKeyboard(gratitudeField);
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(saveButtonFinder, findsOneWidget);
+    await tester.enterText(
+      gratitudeField,
+      'I am grateful for one sincere pause.',
+    );
+    expect(saveButtonFinder, findsOneWidget);
+    expect(tester.widget<GoldButton>(saveButtonFinder).onPressed, isNotNull);
+    await tester.tap(find.text('Save Reflection'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reflection saved.'), findsOneWidget);
+    expect(
+      find.text('A quiet conversation gave clarity today.'),
+      findsWidgets,
+    );
+
+    final savedEntries = await tester.runAsync(
+          LocalStorageService.journalEntries,
+        ) ??
+        const <LocalJournalEntry>[];
+    expect(savedEntries, hasLength(1));
+    expect(
+        savedEntries.single.text, 'A quiet conversation gave clarity today.');
+    expect(
+      savedEntries.single.intention,
+      'Carry patience into the next conversation.',
+    );
+    expect(
+        savedEntries.single.gratitude, 'I am grateful for one sincere pause.');
+
+    await pumpScreen(tester, const JournalPageWidget());
+    await pumpUntilFound(
+      tester,
+      find.text('A quiet conversation gave clarity today.'),
+    );
+    expect(
+      find.text('A quiet conversation gave clarity today.'),
+      findsWidgets,
+    );
+
+    await pumpScreen(tester, const SavedVersesPageWidget());
+    await pumpUntilFound(tester, find.text('Journal Reflections'));
+
+    expect(find.text('Journal Reflections'), findsOneWidget);
+    expect(
+      find.text('A quiet conversation gave clarity today.'),
+      findsWidgets,
+    );
+    expect(find.text('Carry patience into the next conversation.'),
+        findsOneWidget);
+    expect(find.text('I am grateful for one sincere pause.'), findsOneWidget);
   });
 
   testWidgets('Settings clears local data only after confirmation', (
@@ -180,14 +269,14 @@ void main() {
     });
 
     await pumpScreen(tester, const SettingsPageWidget());
-    await pumpUntilFound(tester, find.text('Clear Local Data'));
+    await pumpUntilFound(tester, find.text('Clear Local Memory'));
 
     expect(find.text('Privacy Policy'), findsOneWidget);
     expect(find.text('Support'), findsWidgets);
     expect(find.text('Show Sanskrit'), findsOneWidget);
     expect(find.text('Show Transliteration'), findsOneWidget);
 
-    await scrollToAndTap(tester, find.text('Clear Local Data'));
+    await scrollToAndTap(tester, find.text('Clear Local Memory'));
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
@@ -196,8 +285,8 @@ void main() {
       isNotEmpty,
     );
 
-    await scrollToAndTap(tester, find.text('Clear Local Data'));
-    await tester.tap(find.text('Clear'));
+    await scrollToAndTap(tester, find.text('Clear Local Memory'));
+    await tester.tap(find.text('Clear Local Memory').last);
     await tester.pumpAndSettle();
 
     expect(

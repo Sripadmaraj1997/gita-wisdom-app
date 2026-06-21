@@ -202,17 +202,12 @@ class GitaBottomNav extends StatelessWidget {
       decoration: BoxDecoration(
         color: kCard,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: kGold.withValues(alpha: 0.28)),
+        border: Border.all(color: kGold.withValues(alpha: 0.14)),
         boxShadow: [
           BoxShadow(
-            color: kGold.withValues(alpha: 0.22),
-            blurRadius: 28,
-            offset: const Offset(0, -8),
-          ),
-          BoxShadow(
-            color: kRoyalPurple.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: kDeepBrinjal.withValues(alpha: 0.24),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -300,20 +295,15 @@ class PurpleVerseCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [kDeepBrinjal, kRoyalPurple, kDeepBrinjal],
+            colors: [kNavy, kPeacockBlue, kNavy],
           ),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: kGold.withValues(alpha: 0.48)),
+          border: Border.all(color: kGold.withValues(alpha: 0.22)),
           boxShadow: [
             BoxShadow(
-              color: kGold.withValues(alpha: 0.28),
-              blurRadius: 34,
-              offset: const Offset(0, 16),
-            ),
-            BoxShadow(
-              color: kDeepBrinjal.withValues(alpha: 0.20),
-              blurRadius: 28,
-              offset: const Offset(0, 14),
+              color: kDeepBrinjal.withValues(alpha: 0.22),
+              blurRadius: 22,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -354,13 +344,13 @@ class ChapterListCard extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(colors: [kGold, kSoftGold]),
-              border: Border.all(color: kAntiqueGold.withValues(alpha: 0.70)),
+              color: kCream,
+              border: Border.all(color: kGold.withValues(alpha: 0.24)),
               boxShadow: [
                 BoxShadow(
-                  color: kGold.withValues(alpha: 0.24),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+                  color: kDeepBrinjal.withValues(alpha: 0.12),
+                  blurRadius: 14,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -468,7 +458,7 @@ class IconMedallion extends StatelessWidget {
     super.key,
     required this.icon,
     this.size = 44,
-    this.backgroundColor = kSaffron,
+    this.backgroundColor = kCream,
     this.iconColor = kDeepBrinjal,
   });
 
@@ -485,21 +475,13 @@ class IconMedallion extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            backgroundColor,
-            backgroundColor == kSaffron ? kGold : backgroundColor,
-            backgroundColor == kSaffron ? kSoftGold : backgroundColor,
-          ],
-        ),
-        border: Border.all(color: kAntiqueGold.withValues(alpha: 0.44)),
+        color: backgroundColor,
+        border: Border.all(color: kGold.withValues(alpha: 0.22)),
         boxShadow: [
           BoxShadow(
-            color: backgroundColor.withValues(alpha: 0.16),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+            color: kDeepBrinjal.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -535,14 +517,14 @@ class SpiritualIconPlaceholder extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [kGold, kSoftGold, kAntiqueGold],
+            colors: [kCream, kSoftGold, kCream],
           ),
-          border: Border.all(color: kGold.withValues(alpha: 0.24), width: 1.2),
+          border: Border.all(color: kGold.withValues(alpha: 0.18), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: kGold.withValues(alpha: 0.16),
-              blurRadius: 30,
-              offset: const Offset(0, 14),
+              color: kDeepBrinjal.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -550,7 +532,7 @@ class SpiritualIconPlaceholder extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             Icon(
-              Icons.music_note_rounded,
+              Icons.local_florist_rounded,
               color: kDeepBrinjal.withValues(alpha: 0.14),
               size: size * 0.72,
             ),
@@ -624,7 +606,7 @@ class KrishnaIlluminatedMark extends StatelessWidget {
           Positioned(
             bottom: size * 0.30,
             child: Icon(
-              Icons.music_note_rounded,
+              Icons.auto_stories_rounded,
               size: size * 0.76,
               color: kGold.withValues(alpha: 0.78),
             ),
@@ -819,7 +801,7 @@ class PageHeader extends StatelessWidget {
             right: 6,
             top: -4,
             child: Icon(
-              Icons.music_note_rounded,
+              Icons.spa_rounded,
               size: 46,
               color: kGold.withValues(alpha: 0.10),
             ),
